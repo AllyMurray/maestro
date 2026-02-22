@@ -101,4 +101,7 @@ export const IPC_CHANNELS = {
   DIFF_COMMENT_CREATE: 'diff-comment:create',
   DIFF_COMMENT_LIST: 'diff-comment:list',
   DIFF_COMMENT_RESOLVE: 'diff-comment:resolve',
+
+  // Dialog
+  DIALOG_SELECT_DIRECTORY: 'dialog:select-directory',
 } as const;

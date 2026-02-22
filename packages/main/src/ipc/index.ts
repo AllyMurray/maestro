@@ -11,6 +11,8 @@ import { registerIssueHandlers } from './issueHandlers';
 import { registerCheckpointHandlers } from './checkpointHandlers';
 import { registerDiffCommentHandlers } from './diffCommentHandlers';
 import { registerTodoHandlers } from './todoHandlers';
+import { registerDialogHandlers } from './dialogHandlers';
+import { registerTestHandlers } from './testHandlers';
 
 export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerConfigHandlers(ipcMain);
@@ -25,4 +27,6 @@ export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerCheckpointHandlers(ipcMain);
   registerDiffCommentHandlers(ipcMain);
   registerTodoHandlers(ipcMain);
+  registerDialogHandlers(ipcMain);
+  registerTestHandlers(ipcMain);
 }
