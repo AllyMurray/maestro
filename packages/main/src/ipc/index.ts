@@ -6,6 +6,8 @@ import { registerAgentHandlers } from './agentHandlers';
 import { registerSessionHandlers } from './sessionHandlers';
 import { registerTerminalHandlers } from './terminalHandlers';
 import { registerGitHandlers } from './gitHandlers';
+import { registerPRHandlers } from './prHandlers';
+import { registerIssueHandlers } from './issueHandlers';
 
 export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerConfigHandlers(ipcMain);
@@ -15,4 +17,6 @@ export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerSessionHandlers(ipcMain);
   registerTerminalHandlers(ipcMain);
   registerGitHandlers(ipcMain);
+  registerPRHandlers(ipcMain);
+  registerIssueHandlers(ipcMain);
 }
