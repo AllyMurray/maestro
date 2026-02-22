@@ -3,6 +3,8 @@ import { Stack, Group, Tabs, Text, Box, Badge } from '@mantine/core';
 import { ChatPanel } from './ChatPanel';
 import { TerminalPanel } from './TerminalPanel';
 import { GitStatusBar } from './GitStatusBar';
+import { DiffViewer } from './DiffViewer';
+import { CheckpointTimeline } from './CheckpointTimeline';
 import { AgentStatusBadge } from './AgentStatusBadge';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
@@ -20,7 +22,6 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
   const handleSendPrompt = useCallback(
     async (prompt: string) => {
       if (!sessionId) {
-        // Start a new session
         const result = await ipc.invoke<{ sessionId: string }>(IPC_CHANNELS.AGENT_START, {
           workspaceId: workspace.id,
           workspacePath: workspace.worktreePath || '',
@@ -30,7 +31,6 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
         setSessionId(result.sessionId);
         setAgentStatus('running');
 
-        // Send the prompt after session starts
         await ipc.invoke(IPC_CHANNELS.AGENT_SEND, {
           sessionId: result.sessionId,
           prompt,
@@ -45,7 +45,6 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
     [sessionId, workspace],
   );
 
-  // Listen for status updates
   useEffect(() => {
     if (!sessionId) return;
     const unsub = ipc.on(IPC_CHANNELS.AGENT_STATUS, (data: unknown) => {
@@ -92,6 +91,8 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
         <Tabs.List>
           <Tabs.Tab value="chat">Chat</Tabs.Tab>
           <Tabs.Tab value="terminal">Terminal</Tabs.Tab>
+          <Tabs.Tab value="diff">Diff</Tabs.Tab>
+          <Tabs.Tab value="checkpoints">Checkpoints</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="chat" style={{ flex: 1 }}>
@@ -105,6 +106,29 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
         <Tabs.Panel value="terminal" style={{ flex: 1 }}>
           {workspace.worktreePath ? (
             <TerminalPanel workspacePath={workspace.worktreePath} />
+          ) : (
+            <Stack align="center" justify="center" h="100%">
+              <Text c="dimmed">No worktree path set</Text>
+            </Stack>
+          )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="diff" style={{ flex: 1 }}>
+          {workspace.worktreePath ? (
+            <DiffViewer workspacePath={workspace.worktreePath} />
+          ) : (
+            <Stack align="center" justify="center" h="100%">
+              <Text c="dimmed">No worktree path set</Text>
+            </Stack>
+          )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="checkpoints" style={{ flex: 1, overflow: 'auto' }}>
+          {workspace.worktreePath ? (
+            <CheckpointTimeline
+              workspaceId={workspace.id}
+              workspacePath={workspace.worktreePath}
+            />
           ) : (
             <Stack align="center" justify="center" h="100%">
               <Text c="dimmed">No worktree path set</Text>

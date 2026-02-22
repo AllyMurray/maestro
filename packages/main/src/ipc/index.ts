@@ -8,6 +8,8 @@ import { registerTerminalHandlers } from './terminalHandlers';
 import { registerGitHandlers } from './gitHandlers';
 import { registerPRHandlers } from './prHandlers';
 import { registerIssueHandlers } from './issueHandlers';
+import { registerCheckpointHandlers } from './checkpointHandlers';
+import { registerDiffCommentHandlers } from './diffCommentHandlers';
 
 export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerConfigHandlers(ipcMain);
@@ -19,4 +21,6 @@ export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerGitHandlers(ipcMain);
   registerPRHandlers(ipcMain);
   registerIssueHandlers(ipcMain);
+  registerCheckpointHandlers(ipcMain);
+  registerDiffCommentHandlers(ipcMain);
 }
