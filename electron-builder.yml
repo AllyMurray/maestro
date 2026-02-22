@@ -1,0 +1,27 @@
+appId: com.maestro.app
+productName: Maestro
+directories:
+  buildResources: build
+  output: out
+files:
+  - packages/main/dist/**/*
+  - packages/renderer/dist/**/*
+  - packages/shared/dist/**/*
+  - "!**/*.map"
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - universal
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+dmg:
+  artifactName: "${productName}-${version}.${ext}"
+asar: true
+asarUnpack:
+  - "**/*.node"
+extraMetadata:
+  main: packages/main/dist/index.js

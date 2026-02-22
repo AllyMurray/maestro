@@ -1,0 +1,33 @@
+{
+  "name": "maestro",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron AI Agent Orchestrator - run multiple AI coding agents in parallel on isolated git worktrees",
+  "author": "Maestro",
+  "license": "MIT",
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build": "pnpm -r build",
+    "build:main": "pnpm --filter @maestro/main build",
+    "build:renderer": "pnpm --filter @maestro/renderer build",
+    "package": "electron-builder --config electron-builder.yml",
+    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "lint:fix": "eslint packages/*/src --ext .ts,.tsx --fix",
+    "format": "prettier --write 'packages/*/src/**/*.{ts,tsx,json,css}'",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "electron": "^35.1.2",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.20.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
