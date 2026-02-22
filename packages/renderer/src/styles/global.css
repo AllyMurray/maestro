@@ -25,6 +25,11 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Notifications portal overlaps the titlebar drag region — opt out so close button is clickable */
+.mantine-Notifications-root {
+  -webkit-app-region: no-drag;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
