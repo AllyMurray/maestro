@@ -35,9 +35,10 @@ export function DiffViewer({ workspacePath, base }: DiffViewerProps) {
         workspacePath,
         base,
       });
-      setFiles(result);
-      if (result.length > 0 && !selectedFile) {
-        setSelectedFile(result[0].path);
+      const parsed = Array.isArray(result) ? result : [];
+      setFiles(parsed);
+      if (parsed.length > 0 && !selectedFile) {
+        setSelectedFile(parsed[0].path);
       }
     } catch {
       setFiles([]);

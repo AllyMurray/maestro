@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import type { GitStatus, GitFileStatus } from '@maestro/shared';
+import type { GitStatus, GitFileStatus, DiffFile } from '@maestro/shared';
 import { logger } from './logger';
 
 const execFileAsync = promisify(execFile);
@@ -73,12 +73,43 @@ export async function getGitStatus(workspacePath: string): Promise<GitStatus> {
   }
 }
 
-export async function getDiffFiles(workspacePath: string, base?: string): Promise<string> {
-  const args = ['diff', '--stat'];
+export async function getDiffFiles(workspacePath: string, base?: string): Promise<DiffFile[]> {
+  const args = ['diff', '--numstat', '--diff-filter=ADMR'];
   if (base) {
     args.push(base);
   }
-  return git(workspacePath, ...args);
+  const output = await git(workspacePath, ...args);
+  if (!output) return [];
+
+  // Also get name-status to determine file status (added/deleted/modified/renamed)
+  const statusArgs = ['diff', '--name-status', '--diff-filter=ADMR'];
+  if (base) {
+    statusArgs.push(base);
+  }
+  const statusOutput = await git(workspacePath, ...statusArgs);
+  const statusMap = new Map<string, DiffFile['status']>();
+  for (const line of statusOutput.split('\n')) {
+    if (!line) continue;
+    const [code, ...rest] = line.split('\t');
+    const filePath = rest[rest.length - 1]; // For renames, last entry is the new name
+    const statusChar = code[0];
+    const status: DiffFile['status'] =
+      statusChar === 'A' ? 'added' :
+      statusChar === 'D' ? 'deleted' :
+      statusChar === 'R' ? 'renamed' : 'modified';
+    statusMap.set(filePath, status);
+  }
+
+  return output.split('\n').filter(Boolean).map((line) => {
+    const [add, del, ...pathParts] = line.split('\t');
+    const filePath = pathParts.join('\t');
+    return {
+      path: filePath,
+      status: statusMap.get(filePath) ?? 'modified',
+      additions: add === '-' ? 0 : parseInt(add, 10),
+      deletions: del === '-' ? 0 : parseInt(del, 10),
+    };
+  });
 }
 
 export async function getDiff(workspacePath: string, filePath?: string, staged = false): Promise<string> {
