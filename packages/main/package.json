@@ -7,6 +7,11 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:unit": "vitest run --testPathPattern '\\.test\\.ts$' --testPathIgnorePatterns '\\.integration\\.'",
+    "test:integration": "vitest run --testPathPattern '\\.integration\\.test\\.ts$'",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
     "postinstall": "electron-rebuild -m ."
   },
   "dependencies": {
@@ -15,10 +20,12 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
     "@types/better-sqlite3": "^7.6.12",
     "@types/uuid": "^10.0.0",
-    "@electron/rebuild": "^3.7.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "electron": "^35.1.2",
     "typescript": "^5.7.3",
-    "electron": "^35.1.2"
+    "vitest": "^4.0.18"
   }
 }

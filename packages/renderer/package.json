@@ -6,28 +6,39 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:unit": "vitest run --testPathPattern '\\.test\\.tsx?$' --testPathIgnorePatterns '\\.integration\\.'",
+    "test:integration": "vitest run --testPathPattern '\\.integration\\.test\\.tsx?$'",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@maestro/shared": "workspace:*",
     "@mantine/core": "^7.17.0",
     "@mantine/hooks": "^7.17.0",
-    "@mantine/spotlight": "^7.17.0",
     "@mantine/notifications": "^7.17.0",
+    "@mantine/spotlight": "^7.17.0",
+    "immer": "^10.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zustand": "^5.0.3",
-    "immer": "^10.1.1",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.18",
+    "jsdom": "^28.1.0",
     "postcss": "^8.5.1",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
     "typescript": "^5.7.3",
-    "vite": "^6.1.0"
+    "vite": "^6.1.0",
+    "vitest": "^4.0.18"
   }
 }

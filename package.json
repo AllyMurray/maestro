@@ -14,9 +14,15 @@
     "lint": "eslint packages/*/src --ext .ts,.tsx",
     "lint:fix": "eslint packages/*/src --ext .ts,.tsx --fix",
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx,json,css}'",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r test:integration",
+    "test:e2e": "pnpm build && playwright test",
+    "test:coverage": "pnpm -r test:coverage"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^22.13.0",
     "electron": "^35.1.2",
     "electron-builder": "^25.1.8",

@@ -14,3 +14,6 @@ build/*.js
 Thumbs.db
 *.tsbuildinfo
 .vite/
+coverage/
+test-results/
+playwright-report/
