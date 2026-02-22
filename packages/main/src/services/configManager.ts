@@ -3,11 +3,15 @@ import path from 'path';
 import os from 'os';
 import { DATA_DIR_NAME, CONFIG_FILENAME } from '@maestro/shared';
 
-const configPath = path.join(os.homedir(), DATA_DIR_NAME, CONFIG_FILENAME);
+function getConfigPath(): string {
+  const baseDir = process.env.MAESTRO_TEST_DATA_DIR || path.join(os.homedir(), DATA_DIR_NAME);
+  return path.join(baseDir, CONFIG_FILENAME);
+}
 
 let config: Record<string, string> = {};
 
 export function initConfig(): void {
+  const configPath = getConfigPath();
   const dir = path.dirname(configPath);
   fs.mkdirSync(dir, { recursive: true });
 
@@ -21,6 +25,7 @@ export function initConfig(): void {
 }
 
 function saveConfigFile(): void {
+  const configPath = getConfigPath();
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 

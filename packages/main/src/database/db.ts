@@ -5,11 +5,15 @@ import fs from 'fs';
 import { DATA_DIR_NAME, DB_FILENAME } from '@maestro/shared';
 import { runMigrations } from './migrations';
 
-const dbPath = path.join(os.homedir(), DATA_DIR_NAME, DB_FILENAME);
+function getDbPath(): string {
+  const baseDir = process.env.MAESTRO_TEST_DATA_DIR || path.join(os.homedir(), DATA_DIR_NAME);
+  return path.join(baseDir, DB_FILENAME);
+}
 
 let db: Database.Database | null = null;
 
 export function initDatabase(): void {
+  const dbPath = getDbPath();
   const dir = path.dirname(dbPath);
   fs.mkdirSync(dir, { recursive: true });
 

@@ -3,13 +3,17 @@ import path from 'path';
 import os from 'os';
 import { DATA_DIR_NAME, LOG_DIR_NAME } from '@maestro/shared';
 
-const logDir = path.join(os.homedir(), DATA_DIR_NAME, LOG_DIR_NAME);
+function getLogDir(): string {
+  const baseDir = process.env.MAESTRO_TEST_DATA_DIR || path.join(os.homedir(), DATA_DIR_NAME);
+  return path.join(baseDir, LOG_DIR_NAME);
+}
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
 let logStream: fs.WriteStream | null = null;
 
 export function initLogger(): void {
+  const logDir = getLogDir();
   fs.mkdirSync(logDir, { recursive: true });
   const logFile = path.join(logDir, `maestro-${new Date().toISOString().split('T')[0]}.log`);
   logStream = fs.createWriteStream(logFile, { flags: 'a' });
