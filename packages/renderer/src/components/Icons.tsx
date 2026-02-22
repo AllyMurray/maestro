@@ -62,3 +62,7 @@ export const IconGitPullRequest = createIcon(
 export const IconArchive = createIcon(
   'M21 8v13H3V8M1 3h22v5H1zM10 12h4',
 );
+export const IconPlayerStop = createIcon('M6 6h12v12H6z');
+export const IconLink = createIcon(
+  'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
+);

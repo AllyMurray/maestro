@@ -1,8 +1,11 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Stack, Paper, Text, ScrollArea, Box, Group, Loader, Code } from '@mantine/core';
+import { Stack, Paper, Text, ScrollArea, Box, Group, Loader, Code, ActionIcon } from '@mantine/core';
 import { AgentStatusBadge } from './AgentStatusBadge';
 import { ChatInput } from './ChatInput';
-import type { AgentOutput, AgentStatus } from '@maestro/shared';
+import { IconPlayerStop } from './Icons';
+import { ipc } from '../services/ipc';
+import { IPC_CHANNELS } from '@maestro/shared';
+import type { AgentOutput, AgentStatus, Message } from '@maestro/shared';
 
 interface ChatMessage {
   id: string;
@@ -16,9 +19,10 @@ interface ChatPanelProps {
   sessionId: string | null;
   agentStatus: AgentStatus;
   onSend: (prompt: string) => void;
+  onStop?: () => void;
 }
 
-export function ChatPanel({ sessionId, agentStatus, onSend }: ChatPanelProps) {
+export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamBuffer, setStreamBuffer] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -124,6 +128,26 @@ export function ChatPanel({ sessionId, agentStatus, onSend }: ChatPanelProps) {
     };
   }, [sessionId, addMessage]);
 
+  // Load message history when sessionId changes
+  useEffect(() => {
+    if (!sessionId) return;
+    ipc
+      .invoke<Message[]>(IPC_CHANNELS.MESSAGE_LIST, sessionId)
+      .then((history) => {
+        if (history && history.length > 0) {
+          const restored: ChatMessage[] = history.map((m) => ({
+            id: `history-${m.id}`,
+            role: m.role === 'user' ? 'user' : m.role === 'assistant' ? 'assistant' : m.role === 'tool_call' ? 'tool_call' : 'tool_result',
+            content: m.content,
+            metadata: m.metadataJson ? JSON.parse(m.metadataJson) : undefined,
+            timestamp: m.createdAt,
+          }));
+          setMessages(restored);
+        }
+      })
+      .catch(() => {});
+  }, [sessionId]);
+
   // Auto scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -143,7 +167,20 @@ export function ChatPanel({ sessionId, agentStatus, onSend }: ChatPanelProps) {
         <Text size="sm" fw={600}>
           Chat
         </Text>
-        <AgentStatusBadge status={agentStatus} />
+        <Group gap="xs">
+          {onStop && (agentStatus === 'running' || agentStatus === 'waiting') && (
+            <ActionIcon
+              variant="subtle"
+              color="red"
+              size="sm"
+              aria-label="Stop agent"
+              onClick={onStop}
+            >
+              <IconPlayerStop size={14} />
+            </ActionIcon>
+          )}
+          <AgentStatusBadge status={agentStatus} />
+        </Group>
       </Group>
 
       {/* Messages area */}

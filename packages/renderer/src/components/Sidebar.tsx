@@ -10,10 +10,17 @@ import {
   Divider,
   Badge,
 } from '@mantine/core';
-import { IconFolder, IconGitBranch, IconPlus, IconArchive } from './Icons';
+import { IconFolder, IconGitBranch, IconPlus, IconArchive, IconTrash } from './Icons';
 import { useAppStore } from '../stores/appStore';
 
-export function Sidebar({ onAddProject, onCreateWorkspace }: { onAddProject: () => void; onCreateWorkspace: () => void }) {
+interface SidebarProps {
+  onAddProject: () => void;
+  onCreateWorkspace: () => void;
+  onDeleteProject: (id: string) => void;
+  onDeleteWorkspace: (id: string) => void;
+}
+
+export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDeleteWorkspace }: SidebarProps) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
@@ -64,6 +71,20 @@ export function Sidebar({ onAddProject, onCreateWorkspace }: { onAddProject: () 
                   onClick={() => setActiveProject(project.id)}
                   variant="light"
                   style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+                  rightSection={
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="xs"
+                      aria-label={`Delete project ${project.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteProject(project.id);
+                      }}
+                    >
+                      <IconTrash size={12} />
+                    </ActionIcon>
+                  }
                 />
                 {activeProjectId === project.id && (
                   <Stack gap={0} pl="md">
@@ -92,11 +113,25 @@ export function Sidebar({ onAddProject, onCreateWorkspace }: { onAddProject: () 
                           onClick={() => setActiveWorkspace(ws.id)}
                           variant="light"
                           rightSection={
-                            ws.prUrl ? (
-                              <Badge size="xs" variant="light" color="blue">
-                                PR
-                              </Badge>
-                            ) : null
+                            <Group gap={4}>
+                              {ws.prUrl && (
+                                <Badge size="xs" variant="light" color="blue">
+                                  PR
+                                </Badge>
+                              )}
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                size="xs"
+                                aria-label={`Delete workspace ${ws.name}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteWorkspace(ws.id);
+                                }}
+                              >
+                                <IconTrash size={12} />
+                              </ActionIcon>
+                            </Group>
                           }
                           style={{ borderRadius: 'var(--mantine-radius-sm)' }}
                         />

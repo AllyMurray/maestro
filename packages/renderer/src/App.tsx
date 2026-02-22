@@ -30,6 +30,9 @@ export default function App() {
   const setWorkspaces = useAppStore((s) => s.setWorkspaces);
   const addWorkspace = useAppStore((s) => s.addWorkspace);
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
+  const setActiveWorkspaceTab = useAppStore((s) => s.setActiveWorkspaceTab);
+  const removeProject = useAppStore((s) => s.removeProject);
+  const removeWorkspace = useAppStore((s) => s.removeWorkspace);
 
   const addProject = useAppStore((s) => s.addProject);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
@@ -91,6 +94,7 @@ export default function App() {
           name: data.name,
           branchName: data.branchName,
           targetBranch: data.targetBranch,
+          agentType: data.agentType,
         });
         addWorkspace(ws);
         setActiveWorkspace(ws.id);
@@ -114,10 +118,66 @@ export default function App() {
     setZenMode((z) => !z);
   }, []);
 
+  const handleCreatePR = useCallback(() => {
+    if (activeWorkspaceId) {
+      setActiveWorkspaceTab('pr');
+    }
+  }, [activeWorkspaceId, setActiveWorkspaceTab]);
+
+  const handleOpenDiff = useCallback(() => {
+    if (activeWorkspaceId) {
+      setActiveWorkspaceTab('diff');
+    }
+  }, [activeWorkspaceId, setActiveWorkspaceTab]);
+
+  const handleDeleteProject = useCallback(
+    async (id: string) => {
+      if (!confirm('Delete this project? Workspaces will also be removed.')) return;
+      try {
+        await ipc.invoke(IPC_CHANNELS.PROJECT_DELETE, id);
+        removeProject(id);
+        notifications.show({
+          title: 'Project deleted',
+          message: 'Project has been removed',
+          color: 'green',
+        });
+      } catch (err) {
+        notifications.show({
+          title: 'Failed to delete project',
+          message: String(err),
+          color: 'red',
+        });
+      }
+    },
+    [removeProject],
+  );
+
+  const handleDeleteWorkspace = useCallback(
+    async (id: string) => {
+      if (!confirm('Delete this workspace?')) return;
+      try {
+        await ipc.invoke(IPC_CHANNELS.WORKSPACE_DELETE, id);
+        removeWorkspace(id);
+        notifications.show({
+          title: 'Workspace deleted',
+          message: 'Workspace has been removed',
+          color: 'green',
+        });
+      } catch (err) {
+        notifications.show({
+          title: 'Failed to delete workspace',
+          message: String(err),
+          color: 'red',
+        });
+      }
+    },
+    [removeWorkspace],
+  );
+
   useKeyboardShortcuts({
     toggleSidebar,
-    createPR: () => {}, // Will be handled by workspace
-    openDiff: () => {}, // Will be handled by workspace
+    createPR: handleCreatePR,
+    openDiff: handleOpenDiff,
     newWorkspace: openWsCreator,
     zenMode: handleToggleZen,
   });
@@ -130,8 +190,8 @@ export default function App() {
         onToggleSidebar={toggleSidebar}
         onOpenSettings={openSettings}
         onCreateWorkspace={openWsCreator}
-        onCreatePR={() => {}}
-        onOpenDiff={() => {}}
+        onCreatePR={handleCreatePR}
+        onOpenDiff={handleOpenDiff}
       />
 
       <AppShell
@@ -143,7 +203,12 @@ export default function App() {
         padding={0}
       >
         <AppShell.Navbar bg="dark.8" style={{ borderRight: '1px solid var(--mantine-color-dark-5)' }}>
-          <Sidebar onAddProject={handleAddProject} onCreateWorkspace={openWsCreator} />
+          <Sidebar
+            onAddProject={handleAddProject}
+            onCreateWorkspace={openWsCreator}
+            onDeleteProject={handleDeleteProject}
+            onDeleteWorkspace={handleDeleteWorkspace}
+          />
         </AppShell.Navbar>
 
         <AppShell.Main
@@ -194,8 +259,8 @@ export default function App() {
 
           {/* Main content */}
           <Box style={{ flex: 1, overflow: 'hidden' }}>
-            {activeWorkspace ? (
-              <WorkspaceView workspace={activeWorkspace} />
+            {activeWorkspace && activeProject ? (
+              <WorkspaceView workspace={activeWorkspace} project={activeProject} />
             ) : (
               <WelcomeView onAddProject={handleAddProject} />
             )}
