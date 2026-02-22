@@ -24,10 +24,17 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: !isDev,
     },
   });
 
   if (isDev) {
+    mainWindow.webContents.on('console-message', (_event, level, message) => {
+      if (level >= 2) logger.error(`[renderer] ${message}`);
+    });
+    mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
+      logger.error(`Failed to load: ${url} (${code}: ${desc})`);
+    });
     mainWindow.loadURL(VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
