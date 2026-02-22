@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Modal, TextInput, Stack, Button, Group, Select } from '@mantine/core';
 import { AgentSelector } from './AgentSelector';
+import { ipc } from '../services/ipc';
+import { IPC_CHANNELS } from '@maestro/shared';
 import type { AgentType } from '@maestro/shared';
 
 interface WorkspaceCreatorProps {
@@ -27,6 +29,23 @@ export function WorkspaceCreator({
   const [branchName, setBranchName] = useState('');
   const [agentType, setAgentType] = useState<AgentType | null>(null);
   const [targetBranch, setTargetBranch] = useState(defaultBranch);
+  const [availableAgents, setAvailableAgents] = useState<
+    { value: AgentType; label: string; available: boolean }[] | undefined
+  >();
+
+  useEffect(() => {
+    if (!opened) return;
+    ipc
+      .invoke<{ type: AgentType; displayName: string; available: boolean }[]>(
+        IPC_CHANNELS.AGENT_LIST_AVAILABLE,
+      )
+      .then((agents) =>
+        setAvailableAgents(
+          agents.map((a) => ({ value: a.type, label: a.displayName, available: a.available })),
+        ),
+      )
+      .catch(() => {});
+  }, [opened]);
 
   const handleSubmit = useCallback(() => {
     if (!name || !branchName || !agentType) return;
@@ -78,7 +97,7 @@ export function WorkspaceCreator({
           onChange={(e) => setTargetBranch(e.currentTarget.value)}
         />
 
-        <AgentSelector value={agentType} onChange={setAgentType} />
+        <AgentSelector value={agentType} onChange={setAgentType} availableAgents={availableAgents} />
 
         <Group justify="flex-end" mt="md">
           <Button variant="subtle" onClick={onClose}>
