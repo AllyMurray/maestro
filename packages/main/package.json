@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "postinstall": "electron-rebuild -m ."
   },
   "dependencies": {
     "@maestro/shared": "workspace:*",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/uuid": "^10.0.0",
+    "@electron/rebuild": "^3.7.1",
     "typescript": "^5.7.3",
     "electron": "^35.1.2"
   }
