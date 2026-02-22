@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, session } from 'electron';
 import path from 'path';
 import { registerAllIpcHandlers } from './ipc/index';
 import { initDatabase } from './database/db';
@@ -54,6 +54,20 @@ async function initServices(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  // Set CSP in production only (Vite dev needs relaxed CSP)
+  if (!isDev) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          ],
+        },
+      });
+    });
+  }
+
   await initServices();
   createWindow();
 
