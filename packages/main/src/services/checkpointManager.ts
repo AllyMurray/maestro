@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getDb } from '../database/db';
+import { mapRows } from '../database/mapRow';
 import { logger } from './logger';
 
 const execFileAsync = promisify(execFile);
@@ -41,9 +42,9 @@ export async function createCheckpoint(
 
 export function listCheckpoints(workspaceId: string) {
   const db = getDb();
-  return db
-    .prepare('SELECT * FROM checkpoints WHERE workspace_id = ? ORDER BY created_at DESC')
-    .all(workspaceId);
+  return mapRows(
+    db.prepare('SELECT * FROM checkpoints WHERE workspace_id = ? ORDER BY created_at DESC').all(workspaceId) as Record<string, unknown>[],
+  );
 }
 
 export async function revertToCheckpoint(

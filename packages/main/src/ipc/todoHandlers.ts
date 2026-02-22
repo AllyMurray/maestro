@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron';
-import { IPC_CHANNELS } from '@maestro/shared';
+import { IPC_CHANNELS, Todo } from '@maestro/shared';
 import { getDb } from '../database/db';
+import { mapRows } from '../database/mapRow';
 
 export function registerTodoHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
@@ -19,9 +20,9 @@ export function registerTodoHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(IPC_CHANNELS.TODO_LIST, (_event, workspaceId: string) => {
     const db = getDb();
-    return db
-      .prepare('SELECT * FROM todos WHERE workspace_id = ? ORDER BY created_at ASC')
-      .all(workspaceId);
+    return mapRows<Todo>(
+      db.prepare('SELECT * FROM todos WHERE workspace_id = ? ORDER BY created_at ASC').all(workspaceId) as Record<string, unknown>[],
+    );
   });
 
   ipcMain.handle(

@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron';
 import { IPC_CHANNELS } from '@maestro/shared';
 import { getDb } from '../database/db';
+import { mapRows } from '../database/mapRow';
 
 export function registerDiffCommentHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
@@ -30,15 +31,16 @@ export function registerDiffCommentHandlers(ipcMain: IpcMain): void {
     (_event, data: { workspaceId: string; filePath?: string }) => {
       const db = getDb();
       if (data.filePath) {
-        return db
-          .prepare(
+        return mapRows(
+          db.prepare(
             'SELECT * FROM diff_comments WHERE workspace_id = ? AND file_path = ? ORDER BY line_number',
-          )
-          .all(data.workspaceId, data.filePath);
+          ).all(data.workspaceId, data.filePath) as Record<string, unknown>[],
+        );
       }
-      return db
-        .prepare('SELECT * FROM diff_comments WHERE workspace_id = ? ORDER BY file_path, line_number')
-        .all(data.workspaceId);
+      return mapRows(
+        db.prepare('SELECT * FROM diff_comments WHERE workspace_id = ? ORDER BY file_path, line_number')
+          .all(data.workspaceId) as Record<string, unknown>[],
+      );
     },
   );
 

@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { getDb } from '../database/db';
+import { mapRow, mapRows } from '../database/mapRow';
 import { logger } from './logger';
 import type { Session, SessionStatus, AgentType } from '@maestro/shared';
 
@@ -18,19 +19,20 @@ export function createSession(
 
   logger.info(`Session created: ${id} (${agentType}) for workspace ${workspaceId}`);
 
-  return db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Session;
+  return mapRow<Session>(db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Record<string, unknown>);
 }
 
 export function getSession(id: string): Session | null {
   const db = getDb();
-  return (db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Session) || null;
+  const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id);
+  return row ? mapRow<Session>(row as Record<string, unknown>) : null;
 }
 
 export function listSessions(workspaceId: string): Session[] {
   const db = getDb();
-  return db
-    .prepare('SELECT * FROM sessions WHERE workspace_id = ? ORDER BY created_at DESC')
-    .all(workspaceId) as Session[];
+  return mapRows<Session>(
+    db.prepare('SELECT * FROM sessions WHERE workspace_id = ? ORDER BY created_at DESC').all(workspaceId) as Record<string, unknown>[],
+  );
 }
 
 export function updateSessionStatus(id: string, status: SessionStatus): void {
@@ -75,5 +77,5 @@ export function getMessages(sessionId: string, limit?: number, offset?: number) 
     params.push(offset);
   }
 
-  return db.prepare(query).all(...params);
+  return mapRows(db.prepare(query).all(...params) as Record<string, unknown>[]);
 }
