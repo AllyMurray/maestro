@@ -1,13 +1,17 @@
-import { AppShell, Text, Group, Stack, Box, ActionIcon, Tooltip } from '@mantine/core';
+import { AppShell, Text, Group, Box, ActionIcon, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconSettings, IconLayoutSidebar } from './components/Icons';
+import { IconSettings, IconLayoutSidebar } from './components/Icons';
 import { Sidebar } from './components/Sidebar';
 import { WelcomeView } from './components/WelcomeView';
+import { WorkspaceView } from './components/WorkspaceView';
 import { useAppStore } from './stores/appStore';
 
 export default function App() {
   const [sidebarOpen, { toggle: toggleSidebar }] = useDisclosure(true);
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
+  const workspaces = useAppStore((s) => s.workspaces);
+
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || null;
 
   return (
     <AppShell
@@ -49,7 +53,7 @@ export default function App() {
               </ActionIcon>
             </Tooltip>
             <Text size="sm" fw={600} c="dimmed">
-              Maestro
+              {activeWorkspace ? activeWorkspace.name : 'Maestro'}
             </Text>
           </Group>
           <Group gap="xs" className="titlebar-no-drag">
@@ -62,11 +66,9 @@ export default function App() {
         </Group>
 
         {/* Main content */}
-        <Box style={{ flex: 1, overflow: 'auto' }}>
-          {activeWorkspaceId ? (
-            <Stack p="md">
-              <Text>Workspace view: {activeWorkspaceId}</Text>
-            </Stack>
+        <Box style={{ flex: 1, overflow: 'hidden' }}>
+          {activeWorkspace ? (
+            <WorkspaceView workspace={activeWorkspace} />
           ) : (
             <WelcomeView />
           )}
