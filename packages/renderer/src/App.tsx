@@ -143,7 +143,7 @@ export default function App() {
         padding={0}
       >
         <AppShell.Navbar bg="dark.8" style={{ borderRight: '1px solid var(--mantine-color-dark-5)' }}>
-          <Sidebar onAddProject={handleAddProject} />
+          <Sidebar onAddProject={handleAddProject} onCreateWorkspace={openWsCreator} />
         </AppShell.Navbar>
 
         <AppShell.Main

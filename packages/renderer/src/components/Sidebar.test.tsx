@@ -14,12 +14,12 @@ describe('Sidebar', () => {
   });
 
   it('renders the Projects header', () => {
-    renderWithProviders(<Sidebar onAddProject={() => {}} />);
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={() => {}} />);
     expect(screen.getByText('Projects')).toBeInTheDocument();
   });
 
   it('shows empty state when no projects', () => {
-    renderWithProviders(<Sidebar onAddProject={() => {}} />);
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={() => {}} />);
     expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
   });
 
@@ -31,7 +31,7 @@ describe('Sidebar', () => {
       ] as any,
     });
 
-    renderWithProviders(<Sidebar onAddProject={() => {}} />);
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={() => {}} />);
     expect(screen.getByText('Project Alpha')).toBeInTheDocument();
     expect(screen.getByText('Project Beta')).toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe('Sidebar', () => {
       ] as any,
     });
 
-    renderWithProviders(<Sidebar onAddProject={() => {}} />);
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={() => {}} />);
     expect(screen.getByText('Feature Work')).toBeInTheDocument();
     expect(screen.getByText('Workspaces')).toBeInTheDocument();
   });
@@ -61,7 +61,7 @@ describe('Sidebar', () => {
       workspaces: [],
     });
 
-    renderWithProviders(<Sidebar onAddProject={() => {}} />);
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={() => {}} />);
     expect(screen.getByText('No workspaces')).toBeInTheDocument();
   });
 
@@ -76,14 +76,14 @@ describe('Sidebar', () => {
       ] as any,
     });
 
-    renderWithProviders(<Sidebar onAddProject={() => {}} />);
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={() => {}} />);
     expect(screen.getByText('PR')).toBeInTheDocument();
   });
 
   it('calls onAddProject when add button is clicked', async () => {
     const { userEvent } = await import('../__test-utils__/render');
     const onAddProject = vi.fn();
-    renderWithProviders(<Sidebar onAddProject={onAddProject} />);
+    renderWithProviders(<Sidebar onAddProject={onAddProject} onCreateWorkspace={() => {}} />);
 
     // Find the add button (it's the first actionicon in the header)
     const buttons = screen.getAllByRole('button');
@@ -92,5 +92,26 @@ describe('Sidebar', () => {
     if (addBtn) {
       await userEvent.click(addBtn);
     }
+  });
+
+  it('calls onCreateWorkspace when new workspace button is clicked', async () => {
+    const { userEvent } = await import('../__test-utils__/render');
+
+    useAppStore.setState({
+      activeProjectId: 'p1',
+      projects: [
+        { id: 'p1', name: 'Project Alpha', path: '/alpha', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
+      ] as any,
+      workspaces: [
+        { id: 'ws1', projectId: 'p1', name: 'WS1', branchName: 'feat', worktreePath: '/wt', status: 'active', prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' },
+      ] as any,
+    });
+
+    const onCreateWorkspace = vi.fn();
+    renderWithProviders(<Sidebar onAddProject={() => {}} onCreateWorkspace={onCreateWorkspace} />);
+
+    const newWsBtn = screen.getByLabelText('New workspace');
+    await userEvent.click(newWsBtn);
+    expect(onCreateWorkspace).toHaveBeenCalledOnce();
   });
 });

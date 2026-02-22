@@ -13,7 +13,7 @@ import {
 import { IconFolder, IconGitBranch, IconPlus, IconArchive } from './Icons';
 import { useAppStore } from '../stores/appStore';
 
-export function Sidebar({ onAddProject }: { onAddProject: () => void }) {
+export function Sidebar({ onAddProject, onCreateWorkspace }: { onAddProject: () => void; onCreateWorkspace: () => void }) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
@@ -72,7 +72,7 @@ export function Sidebar({ onAddProject }: { onAddProject: () => void }) {
                         Workspaces
                       </Text>
                       <Tooltip label="New workspace" position="right">
-                        <ActionIcon variant="subtle" color="gray" size="xs">
+                        <ActionIcon variant="subtle" color="gray" size="xs" aria-label="New workspace" onClick={onCreateWorkspace}>
                           <IconPlus size={12} />
                         </ActionIcon>
                       </Tooltip>
