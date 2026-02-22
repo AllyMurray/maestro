@@ -10,6 +10,7 @@ import { registerPRHandlers } from './prHandlers';
 import { registerIssueHandlers } from './issueHandlers';
 import { registerCheckpointHandlers } from './checkpointHandlers';
 import { registerDiffCommentHandlers } from './diffCommentHandlers';
+import { registerTodoHandlers } from './todoHandlers';
 
 export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerConfigHandlers(ipcMain);
@@ -23,4 +24,5 @@ export function registerAllIpcHandlers(ipcMain: IpcMain): void {
   registerIssueHandlers(ipcMain);
   registerCheckpointHandlers(ipcMain);
   registerDiffCommentHandlers(ipcMain);
+  registerTodoHandlers(ipcMain);
 }

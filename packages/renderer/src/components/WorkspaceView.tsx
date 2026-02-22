@@ -5,6 +5,7 @@ import { TerminalPanel } from './TerminalPanel';
 import { GitStatusBar } from './GitStatusBar';
 import { DiffViewer } from './DiffViewer';
 import { CheckpointTimeline } from './CheckpointTimeline';
+import { TodoList } from './TodoList';
 import { AgentStatusBadge } from './AgentStatusBadge';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
@@ -93,6 +94,7 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
           <Tabs.Tab value="terminal">Terminal</Tabs.Tab>
           <Tabs.Tab value="diff">Diff</Tabs.Tab>
           <Tabs.Tab value="checkpoints">Checkpoints</Tabs.Tab>
+          <Tabs.Tab value="todos">Todos</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="chat" style={{ flex: 1 }}>
@@ -134,6 +136,10 @@ export function WorkspaceView({ workspace }: WorkspaceViewProps) {
               <Text c="dimmed">No worktree path set</Text>
             </Stack>
           )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="todos" style={{ flex: 1, overflow: 'auto' }}>
+          <TodoList workspaceId={workspace.id} />
         </Tabs.Panel>
       </Tabs>
     </Stack>
