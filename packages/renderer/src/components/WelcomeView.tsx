@@ -1,7 +1,7 @@
 import { Stack, Title, Text, Button, Group, Paper, SimpleGrid, Box } from '@mantine/core';
 import { IconFolder, IconRocket, IconGitBranch, IconTerminal } from './Icons';
 
-export function WelcomeView() {
+export function WelcomeView({ onAddProject }: { onAddProject: () => void }) {
   return (
     <Stack align="center" justify="center" h="100%" gap="xl" p="xl">
       <Stack align="center" gap="sm">
@@ -13,7 +13,7 @@ export function WelcomeView() {
         </Text>
       </Stack>
 
-      <Button size="lg" leftSection={<IconFolder size={20} />} variant="filled">
+      <Button size="lg" leftSection={<IconFolder size={20} />} variant="filled" onClick={onAddProject}>
         Open Repository
       </Button>
 

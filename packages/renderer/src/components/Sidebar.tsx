@@ -13,7 +13,7 @@ import {
 import { IconFolder, IconGitBranch, IconPlus, IconArchive } from './Icons';
 import { useAppStore } from '../stores/appStore';
 
-export function Sidebar() {
+export function Sidebar({ onAddProject }: { onAddProject: () => void }) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
@@ -39,7 +39,7 @@ export function Sidebar() {
           Projects
         </Text>
         <Tooltip label="Add project" position="right">
-          <ActionIcon variant="subtle" color="gray" size="sm" className="titlebar-no-drag">
+          <ActionIcon variant="subtle" color="gray" size="sm" className="titlebar-no-drag" onClick={onAddProject}>
             <IconPlus size={14} />
           </ActionIcon>
         </Tooltip>

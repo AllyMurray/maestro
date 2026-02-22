@@ -31,8 +31,37 @@ export default function App() {
   const addWorkspace = useAppStore((s) => s.addWorkspace);
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
 
+  const addProject = useAppStore((s) => s.addProject);
+  const setActiveProject = useAppStore((s) => s.setActiveProject);
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || null;
   const activeProject = projects.find((p) => p.id === activeProjectId) || null;
+
+  const handleAddProject = useCallback(async () => {
+    try {
+      const dirPath = await ipc.invoke<string | null>(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY);
+      if (!dirPath) return;
+
+      const name = dirPath.split('/').pop() || dirPath;
+      const project = await ipc.invoke<Project>(IPC_CHANNELS.PROJECT_CREATE, {
+        name,
+        path: dirPath,
+      });
+      addProject(project);
+      setActiveProject(project.id);
+      notifications.show({
+        title: 'Project added',
+        message: name,
+        color: 'green',
+      });
+    } catch (err) {
+      notifications.show({
+        title: 'Failed to add project',
+        message: String(err),
+        color: 'red',
+      });
+    }
+  }, [addProject, setActiveProject]);
 
   // Load projects on startup
   useEffect(() => {
@@ -114,7 +143,7 @@ export default function App() {
         padding={0}
       >
         <AppShell.Navbar bg="dark.8" style={{ borderRight: '1px solid var(--mantine-color-dark-5)' }}>
-          <Sidebar />
+          <Sidebar onAddProject={handleAddProject} />
         </AppShell.Navbar>
 
         <AppShell.Main
@@ -168,7 +197,7 @@ export default function App() {
             {activeWorkspace ? (
               <WorkspaceView workspace={activeWorkspace} />
             ) : (
-              <WelcomeView />
+              <WelcomeView onAddProject={handleAddProject} />
             )}
           </Box>
         </AppShell.Main>
