@@ -107,7 +107,7 @@ describe('appStore', () => {
 
   describe('addWorkspace', () => {
     it('adds workspace to the beginning', () => {
-      const ws = { id: 'ws1', projectId: 'p1', name: 'WS', branchName: 'main', worktreePath: null, status: 'active' as const, prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' };
+      const ws = { id: 'ws1', projectId: 'p1', name: 'WS', branchName: 'main', worktreePath: null, status: 'in_progress' as const, prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' };
       useAppStore.getState().addWorkspace(ws as any);
 
       expect(useAppStore.getState().workspaces).toHaveLength(1);
@@ -116,7 +116,7 @@ describe('appStore', () => {
 
   describe('removeWorkspace', () => {
     it('removes workspace and clears active if matching', () => {
-      const ws = { id: 'ws1', projectId: 'p1', name: 'WS', branchName: 'main', worktreePath: null, status: 'active' as const, prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' };
+      const ws = { id: 'ws1', projectId: 'p1', name: 'WS', branchName: 'main', worktreePath: null, status: 'in_progress' as const, prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' };
       useAppStore.getState().setWorkspaces([ws as any]);
       useAppStore.getState().setActiveWorkspace('ws1');
       useAppStore.getState().removeWorkspace('ws1');

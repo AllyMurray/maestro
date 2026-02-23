@@ -1,12 +1,17 @@
 import { create } from 'zustand';
-import type { Project, Workspace, Session } from '@maestro/shared';
+import type { Project, Workspace } from '@maestro/shared';
+
+type RightPanelTab = 'files' | 'changes' | 'checks';
 
 interface AppState {
   // Navigation
   activeProjectId: string | null;
   activeWorkspaceId: string | null;
   activeSessionId: string | null;
-  activeWorkspaceTab: string | null;
+
+  // Right panel
+  rightPanelTab: RightPanelTab;
+  rightPanelOpen: boolean;
 
   // Data
   projects: Project[];
@@ -16,7 +21,8 @@ interface AppState {
   setActiveProject: (id: string | null) => void;
   setActiveWorkspace: (id: string | null) => void;
   setActiveSession: (id: string | null) => void;
-  setActiveWorkspaceTab: (tab: string | null) => void;
+  setRightPanelTab: (tab: RightPanelTab) => void;
+  toggleRightPanel: () => void;
   setProjects: (projects: Project[]) => void;
   setWorkspaces: (workspaces: Workspace[]) => void;
   addProject: (project: Project) => void;
@@ -30,14 +36,16 @@ export const useAppStore = create<AppState>((set) => ({
   activeProjectId: null,
   activeWorkspaceId: null,
   activeSessionId: null,
-  activeWorkspaceTab: 'chat',
+  rightPanelTab: 'changes',
+  rightPanelOpen: true,
   projects: [],
   workspaces: [],
 
   setActiveProject: (id) => set({ activeProjectId: id, activeWorkspaceId: null }),
   setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
   setActiveSession: (id) => set({ activeSessionId: id }),
-  setActiveWorkspaceTab: (tab) => set({ activeWorkspaceTab: tab }),
+  setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+  toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
   setProjects: (projects) => set({ projects }),
   setWorkspaces: (workspaces) => set({ workspaces }),
   addProject: (project) => set((s) => ({ projects: [project, ...s.projects] })),

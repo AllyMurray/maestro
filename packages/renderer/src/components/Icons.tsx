@@ -66,3 +66,9 @@ export const IconPlayerStop = createIcon('M6 6h12v12H6z');
 export const IconLink = createIcon(
   'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
 );
+export const IconChevronDown = createIcon('M6 9l6 6 6-6');
+export const IconFile = createIcon(
+  'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6',
+);
+export const IconDotsVertical = createIcon('M12 5v.01M12 12v.01M12 19v.01');
+export const IconPanelRight = createIcon('M3 3h18v18H3zM15 3v18');
