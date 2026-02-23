@@ -10,6 +10,8 @@ export class ClaudeCodeManager extends BaseAgentManager {
 
   private process: ChildProcess | null = null;
   private buffer = '';
+  private stderrBuffer = '';
+  private _opts: AgentOpts = {};
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -25,33 +27,9 @@ export class ClaudeCodeManager extends BaseAgentManager {
 
   async start(workspacePath: string, opts: AgentOpts): Promise<void> {
     this._workspacePath = workspacePath;
-    this.setStatus('starting');
-
-    const args: string[] = [
-      '-p', '',  // Will be filled on send
-      '--output-format', 'stream-json',
-      '--verbose',
-    ];
-
-    if (opts.model) {
-      args.push('--model', opts.model);
-    }
-
-    if (opts.resumeSessionId) {
-      args.push('--resume', opts.resumeSessionId);
-    }
-
-    if (opts.permissions === 'skip') {
-      args.push('--dangerously-skip-permissions');
-    }
-
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
-    if (opts.apiKey) {
-      env.ANTHROPIC_API_KEY = opts.apiKey;
-    }
-
-    this.setStatus('running');
-    logger.info(`Claude Code started in ${workspacePath}`);
+    this._opts = opts;
+    this.setStatus('waiting');
+    logger.info(`Claude Code ready in ${workspacePath} (model=${opts.model || 'default'}, permissions=${opts.permissions || 'default'})`);
   }
 
   async send(prompt: string): Promise<void> {
@@ -69,9 +47,22 @@ export class ClaudeCodeManager extends BaseAgentManager {
 
     if (this._sessionId) {
       args.push('--resume', this._sessionId);
+    } else if (this._opts.resumeSessionId) {
+      args.push('--resume', this._opts.resumeSessionId);
+    }
+
+    if (this._opts.model) {
+      args.push('--model', this._opts.model);
+    }
+
+    if (this._opts.permissions === 'skip') {
+      args.push('--dangerously-skip-permissions');
     }
 
     const env: Record<string, string> = { ...process.env as Record<string, string> };
+    if (this._opts.apiKey) {
+      env.ANTHROPIC_API_KEY = this._opts.apiKey;
+    }
 
     this.process = spawn(this.command, args, {
       cwd: this._workspacePath!,
@@ -80,6 +71,9 @@ export class ClaudeCodeManager extends BaseAgentManager {
     });
 
     this.buffer = '';
+    this.stderrBuffer = '';
+
+    logger.info(`[claude] Spawned PID ${this.process.pid} with args: ${args.join(' ')}`);
 
     this.process.stdout?.on('data', (data: Buffer) => {
       this.buffer += data.toString();
@@ -87,9 +81,12 @@ export class ClaudeCodeManager extends BaseAgentManager {
     });
 
     this.process.stderr?.on('data', (data: Buffer) => {
-      const text = data.toString().trim();
-      if (text) {
-        logger.debug(`[claude stderr] ${text}`);
+      const text = data.toString();
+      this.stderrBuffer += text;
+      const trimmed = text.trim();
+      if (trimmed) {
+        logger.debug(`[claude stderr] ${trimmed}`);
+        this.emitOutput('error', trimmed);
       }
     });
 
@@ -97,8 +94,13 @@ export class ClaudeCodeManager extends BaseAgentManager {
       if (code === 0) {
         this.setStatus('waiting');
       } else {
+        const stderr = this.stderrBuffer.trim();
         this.setStatus('error');
-        this.emit('error', new Error(`Claude Code exited with code ${code}`));
+        this.emit('error', new Error(
+          stderr
+            ? `Claude Code exited with code ${code}: ${stderr}`
+            : `Claude Code exited with code ${code}`
+        ));
       }
       this.process = null;
     });
@@ -118,6 +120,7 @@ export class ClaudeCodeManager extends BaseAgentManager {
       if (!line.trim()) continue;
       try {
         const msg = JSON.parse(line);
+        logger.debug(`[claude] Received JSON type: ${msg.type}`);
         this.handleMessage(msg);
       } catch {
         // Not valid JSON, might be partial output
@@ -180,6 +183,10 @@ export class ClaudeCodeManager extends BaseAgentManager {
         }
         break;
       }
+
+      default:
+        logger.debug(`[claude] Unhandled message type: ${type}`);
+        break;
     }
   }
 

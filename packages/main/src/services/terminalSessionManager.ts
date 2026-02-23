@@ -1,9 +1,35 @@
 import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import { logger } from './logger';
 
 // node-pty must be required at runtime (native module)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pty = require('node-pty');
+
+let spawnHelperFixed = false;
+
+function ensureSpawnHelper(): void {
+  if (spawnHelperFixed) return;
+  try {
+    const ptyDir = path.dirname(path.dirname(require.resolve('node-pty')));
+    const prebuildsDir = path.join(ptyDir, 'prebuilds');
+    logger.info(`ensureSpawnHelper: ptyDir=${ptyDir}, prebuildsExists=${fs.existsSync(prebuildsDir)}`);
+    if (fs.existsSync(prebuildsDir)) {
+      const platforms = fs.readdirSync(prebuildsDir);
+      for (const platform of platforms) {
+        const helper = path.join(prebuildsDir, platform, 'spawn-helper');
+        if (fs.existsSync(helper)) {
+          fs.chmodSync(helper, 0o755);
+          logger.info(`Fixed permissions on ${helper}`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn(`Could not fix spawn-helper permissions: ${err}`);
+  }
+  spawnHelperFixed = true;
+}
 
 interface IPty {
   pid: number;
@@ -33,6 +59,8 @@ export function createTerminal(
   onData?: (data: string) => void,
   onExit?: (exitCode: number) => void,
 ): { id: string } {
+  ensureSpawnHelper();
+
   const id = `term-${++idCounter}`;
   const shell = process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/zsh');
 

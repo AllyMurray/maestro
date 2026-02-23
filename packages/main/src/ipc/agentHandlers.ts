@@ -31,8 +31,12 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
 
       // Wire up events
       const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) {
+        logger.error('AGENT_START: BrowserWindow.fromWebContents returned null');
+      }
 
       manager.on('output', (output) => {
+        logger.debug(`Forwarding agent output: type=${output.type}, sessionId=${session.id}`);
         window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
           sessionId: session.id,
           output,

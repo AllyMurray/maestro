@@ -28,8 +28,8 @@ describe('ClaudeCodeManager', () => {
     manager.on('status', (s) => statuses.push(s));
 
     await manager.start('/test', {});
-    expect(statuses).toContain('starting');
-    expect(statuses).toContain('running');
+    // start() only sets 'waiting' — actual 'running' happens in send()
+    expect(statuses).toContain('waiting');
   });
 
   describe('processBuffer (via handleMessage)', () => {
