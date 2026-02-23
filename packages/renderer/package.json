@@ -8,8 +8,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:unit": "vitest run --testPathPattern '\\.test\\.tsx?$' --testPathIgnorePatterns '\\.integration\\.'",
-    "test:integration": "vitest run --testPathPattern '\\.integration\\.test\\.tsx?$'",
+    "test:unit": "vitest run --exclude '**/*.integration.*'",
+    "test:integration": "vitest run --passWithNoTests '**/*.integration.test.ts?(x)'",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
