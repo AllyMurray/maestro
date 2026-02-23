@@ -8,7 +8,28 @@ import {
   discoverAgents,
 } from '../services/agents';
 import { createSession, updateSessionStatus, setAgentSessionId, addMessage } from '../services/sessionManager';
+import { getConfig } from '../services/configManager';
 import { logger } from '../services/logger';
+
+const API_KEY_CONFIG: Record<AgentType, string> = {
+  'claude-code': 'anthropic_api_key',
+  'codex': 'openai_api_key',
+  'cursor': 'cursor_api_key',
+};
+
+function resolveOpts(agentType: AgentType, opts: AgentOpts): AgentOpts {
+  const resolved = { ...opts };
+  if (!resolved.apiKey) {
+    const configKey = API_KEY_CONFIG[agentType];
+    const stored = configKey ? getConfig(configKey) : null;
+    if (stored) resolved.apiKey = stored;
+  }
+  if (!resolved.model && agentType === 'claude-code') {
+    const model = getConfig('claude_model');
+    if (model) resolved.model = model;
+  }
+  return resolved;
+}
 
 export function registerAgentHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(IPC_CHANNELS.AGENT_LIST_AVAILABLE, async () => {
@@ -26,7 +47,14 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
         opts?: AgentOpts;
       },
     ) => {
-      const session = createSession(data.workspaceId, data.agentType, data.opts?.model);
+      if (!data.workspacePath) {
+        throw new Error('workspacePath is required to start an agent');
+      }
+
+      logger.info(`AGENT_START: workspaceId=${data.workspaceId}, agentType=${data.agentType}`);
+
+      const opts = resolveOpts(data.agentType, data.opts || {});
+      const session = createSession(data.workspaceId, data.agentType, opts.model);
       const manager = createAgentManager(data.agentType);
 
       // Wire up events
@@ -69,7 +97,7 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
       });
 
       registerManager(session.id, manager);
-      await manager.start(data.workspacePath, data.opts || {});
+      await manager.start(data.workspacePath, opts);
 
       return { sessionId: session.id };
     },
