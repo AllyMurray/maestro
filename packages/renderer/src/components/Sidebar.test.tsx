@@ -20,9 +20,9 @@ describe('Sidebar', () => {
     });
   });
 
-  it('renders the Projects header', () => {
+  it('renders the Maestro header', () => {
     renderWithProviders(<Sidebar {...defaultProps} />);
-    expect(screen.getByText('Projects')).toBeInTheDocument();
+    expect(screen.getByText('Maestro')).toBeInTheDocument();
   });
 
   it('shows empty state when no projects', () => {
@@ -30,36 +30,35 @@ describe('Sidebar', () => {
     expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
   });
 
-  it('renders project list', () => {
+  it('renders project name when single project selected', () => {
     useAppStore.setState({
+      activeProjectId: 'p1',
       projects: [
         { id: 'p1', name: 'Project Alpha', path: '/alpha', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
-        { id: 'p2', name: 'Project Beta', path: '/beta', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
       ] as any,
     });
 
     renderWithProviders(<Sidebar {...defaultProps} />);
     expect(screen.getByText('Project Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Project Beta')).toBeInTheDocument();
   });
 
-  it('shows workspaces for active project', () => {
+  it('shows workspaces grouped by status', () => {
     useAppStore.setState({
       activeProjectId: 'p1',
       projects: [
         { id: 'p1', name: 'Project Alpha', path: '/alpha', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
       ] as any,
       workspaces: [
-        { id: 'ws1', projectId: 'p1', name: 'Feature Work', branchName: 'feat/test', worktreePath: '/wt', status: 'active', prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' },
+        { id: 'ws1', projectId: 'p1', name: 'Feature Work', branchName: 'feat/test', worktreePath: '/wt', agentType: 'claude-code', status: 'in_progress', prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' },
       ] as any,
     });
 
     renderWithProviders(<Sidebar {...defaultProps} />);
     expect(screen.getByText('Feature Work')).toBeInTheDocument();
-    expect(screen.getByText('Workspaces')).toBeInTheDocument();
+    expect(screen.getByText('In progress')).toBeInTheDocument();
   });
 
-  it('shows "No workspaces" when project has none', () => {
+  it('shows "No workspaces" in empty status groups', () => {
     useAppStore.setState({
       activeProjectId: 'p1',
       projects: [
@@ -69,7 +68,7 @@ describe('Sidebar', () => {
     });
 
     renderWithProviders(<Sidebar {...defaultProps} />);
-    expect(screen.getByText('No workspaces')).toBeInTheDocument();
+    expect(screen.getAllByText('No workspaces').length).toBeGreaterThan(0);
   });
 
   it('shows PR badge on workspace with PR', () => {
@@ -79,7 +78,7 @@ describe('Sidebar', () => {
         { id: 'p1', name: 'P1', path: '/p1', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
       ] as any,
       workspaces: [
-        { id: 'ws1', projectId: 'p1', name: 'WS1', branchName: 'feat', worktreePath: '/wt', status: 'active', prNumber: '42', prUrl: 'https://github.com/test/pull/42', targetBranch: 'main', createdAt: '' },
+        { id: 'ws1', projectId: 'p1', name: 'WS1', branchName: 'feat', worktreePath: '/wt', agentType: 'claude-code', status: 'in_progress', prNumber: '42', prUrl: 'https://github.com/test/pull/42', targetBranch: 'main', createdAt: '' },
       ] as any,
     });
 
@@ -87,78 +86,20 @@ describe('Sidebar', () => {
     expect(screen.getByText('PR')).toBeInTheDocument();
   });
 
-  it('calls onAddProject when add button is clicked', async () => {
-    const onAddProject = vi.fn();
-    renderWithProviders(<Sidebar {...defaultProps} onAddProject={onAddProject} />);
-
-    const buttons = screen.getAllByRole('button');
-    const addBtn = buttons.find((btn) => btn.getAttribute('aria-label')?.includes('Add') || true);
-    if (addBtn) {
-      await userEvent.click(addBtn);
-    }
-  });
-
-  it('calls onCreateWorkspace when new workspace button is clicked', async () => {
-    useAppStore.setState({
-      activeProjectId: 'p1',
-      projects: [
-        { id: 'p1', name: 'Project Alpha', path: '/alpha', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
-      ] as any,
-      workspaces: [
-        { id: 'ws1', projectId: 'p1', name: 'WS1', branchName: 'feat', worktreePath: '/wt', status: 'active', prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' },
-      ] as any,
-    });
-
-    const onCreateWorkspace = vi.fn();
-    renderWithProviders(<Sidebar {...defaultProps} onCreateWorkspace={onCreateWorkspace} />);
-
-    const newWsBtn = screen.getByLabelText('New workspace');
-    await userEvent.click(newWsBtn);
-    expect(onCreateWorkspace).toHaveBeenCalledOnce();
-  });
-
-  it('shows delete button for each project', () => {
-    useAppStore.setState({
-      projects: [
-        { id: 'p1', name: 'Alpha', path: '/alpha', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
-        { id: 'p2', name: 'Beta', path: '/beta', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
-      ] as any,
-    });
-
+  it('renders Add repository button', () => {
     renderWithProviders(<Sidebar {...defaultProps} />);
-    expect(screen.getByLabelText('Delete project Alpha')).toBeInTheDocument();
-    expect(screen.getByLabelText('Delete project Beta')).toBeInTheDocument();
+    expect(screen.getByText('Add repository')).toBeInTheDocument();
   });
 
-  it('calls onDeleteProject when delete button clicked', async () => {
-    useAppStore.setState({
-      projects: [
-        { id: 'p1', name: 'Alpha', path: '/alpha', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
-      ] as any,
-    });
-
-    const onDeleteProject = vi.fn();
-    renderWithProviders(<Sidebar {...defaultProps} onDeleteProject={onDeleteProject} />);
-
-    await userEvent.click(screen.getByLabelText('Delete project Alpha'));
-    expect(onDeleteProject).toHaveBeenCalledWith('p1');
-  });
-
-  it('calls onDeleteWorkspace when delete button clicked', async () => {
+  it('renders New workspace button when project is active', () => {
     useAppStore.setState({
       activeProjectId: 'p1',
       projects: [
         { id: 'p1', name: 'P1', path: '/p1', gitPlatform: null, defaultBranch: 'main', settingsJson: '{}', createdAt: '' },
       ] as any,
-      workspaces: [
-        { id: 'ws1', projectId: 'p1', name: 'MyWorkspace', branchName: 'feat', worktreePath: '/wt', status: 'active', prNumber: null, prUrl: null, targetBranch: 'main', createdAt: '' },
-      ] as any,
     });
 
-    const onDeleteWorkspace = vi.fn();
-    renderWithProviders(<Sidebar {...defaultProps} onDeleteWorkspace={onDeleteWorkspace} />);
-
-    await userEvent.click(screen.getByLabelText('Delete workspace MyWorkspace'));
-    expect(onDeleteWorkspace).toHaveBeenCalledWith('ws1');
+    renderWithProviders(<Sidebar {...defaultProps} />);
+    expect(screen.getByText('New workspace')).toBeInTheDocument();
   });
 });

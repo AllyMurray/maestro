@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Stack,
   Group,
@@ -6,18 +7,44 @@ import {
   ScrollArea,
   ActionIcon,
   Tooltip,
-  Box,
-  Divider,
   Badge,
+  Select,
+  Collapse,
+  Box,
+  Button,
 } from '@mantine/core';
-import { IconFolder, IconGitBranch, IconPlus, IconArchive, IconTrash } from './Icons';
+import { IconFolder, IconGitBranch, IconPlus, IconChevronDown, IconChevronRight } from './Icons';
 import { useAppStore } from '../stores/appStore';
+import type { Workspace, WorkspaceStatus } from '@maestro/shared';
 
 interface SidebarProps {
   onAddProject: () => void;
   onCreateWorkspace: () => void;
   onDeleteProject: (id: string) => void;
   onDeleteWorkspace: (id: string) => void;
+}
+
+const STATUS_CONFIG: Record<WorkspaceStatus, { label: string; color: string; defaultOpen: boolean }> = {
+  in_progress: { label: 'In progress', color: 'blue', defaultOpen: true },
+  in_review: { label: 'In review', color: 'yellow', defaultOpen: true },
+  backlog: { label: 'Backlog', color: 'gray', defaultOpen: true },
+  done: { label: 'Done', color: 'green', defaultOpen: false },
+  cancelled: { label: 'Cancelled', color: 'red', defaultOpen: false },
+};
+
+const STATUS_ORDER: WorkspaceStatus[] = ['in_progress', 'in_review', 'backlog', 'done', 'cancelled'];
+
+function AgentTypeBadge({ type }: { type: string }) {
+  const labels: Record<string, string> = {
+    'claude-code': 'CC',
+    codex: 'CX',
+    cursor: 'CR',
+  };
+  return (
+    <Badge size="xs" variant="dot" color="gray">
+      {labels[type] || type}
+    </Badge>
+  );
 }
 
 export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDeleteWorkspace }: SidebarProps) {
@@ -28,13 +55,41 @@ export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDe
   const setActiveProject = useAppStore((s) => s.setActiveProject);
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
 
-  const activeWorkspaces = workspaces.filter(
-    (w) => w.projectId === activeProjectId && w.status === 'active',
-  );
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const status of STATUS_ORDER) {
+      initial[status] = !STATUS_CONFIG[status].defaultOpen;
+    }
+    return initial;
+  });
+
+  const toggleSection = (status: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [status]: !prev[status] }));
+  };
+
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const projectWorkspaces = workspaces.filter((w) => w.projectId === activeProjectId);
+
+  // Group workspaces by status
+  const groupedWorkspaces: Record<WorkspaceStatus, Workspace[]> = {
+    in_progress: [],
+    in_review: [],
+    backlog: [],
+    done: [],
+    cancelled: [],
+  };
+  for (const ws of projectWorkspaces) {
+    const status = ws.status as WorkspaceStatus;
+    if (groupedWorkspaces[status]) {
+      groupedWorkspaces[status].push(ws);
+    } else {
+      groupedWorkspaces.in_progress.push(ws);
+    }
+  }
 
   return (
     <Stack h="100%" gap={0}>
-      {/* Sidebar header with drag area for titlebar */}
+      {/* Sidebar header with drag area */}
       <Group
         h={52}
         px="md"
@@ -43,107 +98,152 @@ export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDe
         style={{ borderBottom: '1px solid var(--mantine-color-dark-5)', flexShrink: 0 }}
       >
         <Text size="xs" fw={700} c="dimmed" tt="uppercase" className="titlebar-no-drag">
-          Projects
+          Maestro
         </Text>
-        <Tooltip label="Add project" position="right">
-          <ActionIcon variant="subtle" color="gray" size="sm" className="titlebar-no-drag" onClick={onAddProject}>
-            <IconPlus size={14} />
-          </ActionIcon>
-        </Tooltip>
       </Group>
 
-      {/* Projects list */}
+      {/* Project selector */}
+      <Box px="sm" py="xs" style={{ borderBottom: '1px solid var(--mantine-color-dark-5)' }}>
+        {projects.length > 1 ? (
+          <Select
+            size="xs"
+            data={projects.map((p) => ({ value: p.id, label: p.name }))}
+            value={activeProjectId}
+            onChange={(val) => val && setActiveProject(val)}
+            placeholder="Select project"
+          />
+        ) : activeProject ? (
+          <Group gap="xs">
+            <IconFolder size={14} />
+            <Text size="xs" fw={600} truncate>
+              {activeProject.name}
+            </Text>
+          </Group>
+        ) : (
+          <Text size="xs" c="dimmed">
+            No project selected
+          </Text>
+        )}
+      </Box>
+
+      {/* Workspaces grouped by status */}
       <ScrollArea flex={1} scrollbarSize={6}>
-        <Stack gap={0} p="xs">
-          {projects.length === 0 ? (
-            <Text size="xs" c="dimmed" ta="center" py="xl">
+        {activeProjectId ? (
+          <Stack gap={0} py="xs">
+            {STATUS_ORDER.map((status) => {
+              const items = groupedWorkspaces[status];
+              if (items.length === 0 && (status === 'done' || status === 'cancelled')) return null;
+              const config = STATUS_CONFIG[status];
+              const isCollapsed = collapsedSections[status];
+
+              return (
+                <Box key={status}>
+                  <Group
+                    px="sm"
+                    py={4}
+                    gap="xs"
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => toggleSection(status)}
+                  >
+                    {isCollapsed ? (
+                      <IconChevronRight size={10} />
+                    ) : (
+                      <IconChevronDown size={10} />
+                    )}
+                    <Text size="xs" fw={600} c="dimmed">
+                      {config.label}
+                    </Text>
+                    {items.length > 0 && (
+                      <Badge size="xs" variant="light" color={config.color} circle>
+                        {items.length}
+                      </Badge>
+                    )}
+                  </Group>
+                  <Collapse in={!isCollapsed}>
+                    <Stack gap={0} px={4}>
+                      {items.length === 0 ? (
+                        <Text size="xs" c="dimmed" px="sm" py={4}>
+                          No workspaces
+                        </Text>
+                      ) : (
+                        items.map((ws) => (
+                          <NavLink
+                            key={ws.id}
+                            label={
+                              <Group gap={4}>
+                                <Text size="xs" truncate>
+                                  {ws.name}
+                                </Text>
+                              </Group>
+                            }
+                            description={ws.branchName}
+                            leftSection={<IconGitBranch size={14} />}
+                            active={activeWorkspaceId === ws.id}
+                            onClick={() => setActiveWorkspace(ws.id)}
+                            variant="light"
+                            rightSection={
+                              <Group gap={4}>
+                                <AgentTypeBadge type={ws.agentType} />
+                                {ws.prUrl && (
+                                  <Badge size="xs" variant="light" color="blue">
+                                    PR
+                                  </Badge>
+                                )}
+                              </Group>
+                            }
+                            style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+                            styles={{ label: { fontSize: 12 } }}
+                          />
+                        ))
+                      )}
+                    </Stack>
+                  </Collapse>
+                </Box>
+              );
+            })}
+          </Stack>
+        ) : (
+          <Stack align="center" py="xl">
+            <Text size="xs" c="dimmed" ta="center">
               No projects yet.
               <br />
-              Open a git repository to get started.
+              Add a repository to get started.
             </Text>
-          ) : (
-            projects.map((project) => (
-              <Box key={project.id}>
-                <NavLink
-                  label={project.name}
-                  leftSection={<IconFolder size={16} />}
-                  active={activeProjectId === project.id}
-                  onClick={() => setActiveProject(project.id)}
-                  variant="light"
-                  style={{ borderRadius: 'var(--mantine-radius-sm)' }}
-                  rightSection={
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      size="xs"
-                      aria-label={`Delete project ${project.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteProject(project.id);
-                      }}
-                    >
-                      <IconTrash size={12} />
-                    </ActionIcon>
-                  }
-                />
-                {activeProjectId === project.id && (
-                  <Stack gap={0} pl="md">
-                    <Group px="xs" py={4} justify="space-between">
-                      <Text size="xs" c="dimmed" fw={600}>
-                        Workspaces
-                      </Text>
-                      <Tooltip label="New workspace" position="right">
-                        <ActionIcon variant="subtle" color="gray" size="xs" aria-label="New workspace" onClick={onCreateWorkspace}>
-                          <IconPlus size={12} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                    {activeWorkspaces.length === 0 ? (
-                      <Text size="xs" c="dimmed" px="xs" py={4}>
-                        No workspaces
-                      </Text>
-                    ) : (
-                      activeWorkspaces.map((ws) => (
-                        <NavLink
-                          key={ws.id}
-                          label={ws.name}
-                          description={ws.branchName}
-                          leftSection={<IconGitBranch size={14} />}
-                          active={activeWorkspaceId === ws.id}
-                          onClick={() => setActiveWorkspace(ws.id)}
-                          variant="light"
-                          rightSection={
-                            <Group gap={4}>
-                              {ws.prUrl && (
-                                <Badge size="xs" variant="light" color="blue">
-                                  PR
-                                </Badge>
-                              )}
-                              <ActionIcon
-                                variant="subtle"
-                                color="red"
-                                size="xs"
-                                aria-label={`Delete workspace ${ws.name}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDeleteWorkspace(ws.id);
-                                }}
-                              >
-                                <IconTrash size={12} />
-                              </ActionIcon>
-                            </Group>
-                          }
-                          style={{ borderRadius: 'var(--mantine-radius-sm)' }}
-                        />
-                      ))
-                    )}
-                  </Stack>
-                )}
-              </Box>
-            ))
-          )}
-        </Stack>
+          </Stack>
+        )}
       </ScrollArea>
+
+      {/* Bottom actions */}
+      <Stack gap={4} p="sm" style={{ borderTop: '1px solid var(--mantine-color-dark-5)' }}>
+        {activeProjectId && (
+          <Tooltip label="New workspace (Cmd+N)" position="right">
+            <Button
+              variant="subtle"
+              color="gray"
+              size="xs"
+              fullWidth
+              leftSection={<IconPlus size={12} />}
+              onClick={onCreateWorkspace}
+              justify="flex-start"
+            >
+              New workspace
+            </Button>
+          </Tooltip>
+        )}
+        <Tooltip label="Add repository" position="right">
+          <Button
+            variant="subtle"
+            color="gray"
+            size="xs"
+            fullWidth
+            leftSection={<IconFolder size={12} />}
+            onClick={onAddProject}
+            justify="flex-start"
+          >
+            Add repository
+          </Button>
+        </Tooltip>
+      </Stack>
     </Stack>
   );
 }
