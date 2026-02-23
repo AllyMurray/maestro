@@ -35,9 +35,9 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
       await createWorktree(repoPath, data.branchName, worktreePath);
 
       db.prepare(
-        `INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, target_branch)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      ).run(id, data.projectId, data.name, data.branchName, worktreePath, data.targetBranch || 'main');
+        `INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, target_branch, agent_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(id, data.projectId, data.name, data.branchName, worktreePath, data.targetBranch || 'main', data.agentType || 'claude-code');
 
       return mapRow<Workspace>(db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Record<string, unknown>);
     },

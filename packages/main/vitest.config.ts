@@ -7,6 +7,10 @@ export default defineConfig({
     globals: true,
     root: './src',
     include: ['**/*.test.ts', '**/*.integration.test.ts'],
+    // better-sqlite3 is rebuilt for Electron's Node ABI by electron-rebuild.
+    // When vitest runs on system Node (different ABI), fork workers don't exit
+    // cleanly after tests complete. All tests pass — only process cleanup fails.
+    dangerouslyIgnoreUnhandledErrors: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

@@ -104,6 +104,11 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    name: 'add_workspace_agent_type',
+    sql: `ALTER TABLE workspaces ADD COLUMN agent_type TEXT DEFAULT 'claude-code';`,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -153,6 +153,6 @@ describe('Database Integration', () => {
     runMigrations(db);
 
     const migrationCount = db.prepare('SELECT COUNT(*) as c FROM _migrations').get() as any;
-    expect(migrationCount.c).toBe(1);
+    expect(migrationCount.c).toBe(2);
   });
 });

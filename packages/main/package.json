@@ -17,6 +17,7 @@
   "dependencies": {
     "@maestro/shared": "workspace:*",
     "better-sqlite3": "^11.8.1",
+    "node-pty": "^1.1.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

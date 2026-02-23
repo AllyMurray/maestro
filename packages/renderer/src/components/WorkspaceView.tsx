@@ -39,7 +39,7 @@ export function WorkspaceView({ workspace, project }: WorkspaceViewProps) {
         const result = await ipc.invoke<{ sessionId: string }>(IPC_CHANNELS.AGENT_START, {
           workspaceId: workspace.id,
           workspacePath: workspace.worktreePath || '',
-          agentType: 'claude-code' as AgentType,
+          agentType: workspace.agentType,
           opts: {},
         });
         setSessionId(result.sessionId);

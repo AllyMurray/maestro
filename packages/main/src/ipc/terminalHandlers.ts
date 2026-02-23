@@ -5,33 +5,31 @@ import {
   writeToTerminal,
   resizeTerminal,
   closeTerminal,
-  getTerminalProcess,
 } from '../services/terminalSessionManager';
 
 export function registerTerminalHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
     IPC_CHANNELS.TERMINAL_CREATE,
     (event, data: { workspacePath: string; cols?: number; rows?: number }) => {
-      const { id } = createTerminal(data.workspacePath, data.cols, data.rows);
-
-      const proc = getTerminalProcess(id);
       const window = BrowserWindow.fromWebContents(event.sender);
 
-      if (proc) {
-        proc.stdout?.on('data', (data: Buffer) => {
+      const { id } = createTerminal(
+        data.workspacePath,
+        data.cols,
+        data.rows,
+        (output: string) => {
           window?.webContents.send(IPC_CHANNELS.TERMINAL_DATA, {
             terminalId: id,
-            data: data.toString(),
+            data: output,
           });
-        });
-
-        proc.stderr?.on('data', (data: Buffer) => {
+        },
+        () => {
           window?.webContents.send(IPC_CHANNELS.TERMINAL_DATA, {
             terminalId: id,
-            data: data.toString(),
+            data: '\r\n[Process exited]\r\n',
           });
-        });
-      }
+        },
+      );
 
       return { id };
     },

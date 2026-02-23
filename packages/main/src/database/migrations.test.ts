@@ -40,10 +40,12 @@ describe('runMigrations', () => {
     const db = createFreshDb();
     runMigrations(db);
 
-    const migrations = db.prepare('SELECT version, name FROM _migrations').all() as any[];
-    expect(migrations).toHaveLength(1);
+    const migrations = db.prepare('SELECT version, name FROM _migrations ORDER BY version').all() as any[];
+    expect(migrations).toHaveLength(2);
     expect(migrations[0].version).toBe(1);
     expect(migrations[0].name).toBe('initial_schema');
+    expect(migrations[1].version).toBe(2);
+    expect(migrations[1].name).toBe('add_workspace_agent_type');
 
     db.close();
   });
@@ -54,7 +56,7 @@ describe('runMigrations', () => {
     runMigrations(db);
 
     const migrations = db.prepare('SELECT version FROM _migrations').all();
-    expect(migrations).toHaveLength(1);
+    expect(migrations).toHaveLength(2);
 
     db.close();
   });
@@ -85,6 +87,24 @@ describe('runMigrations', () => {
         "INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'nonexistent', 'test', 'main')",
       ).run();
     }).toThrow();
+
+    db.close();
+  });
+
+  it('adds agent_type column to workspaces with default', () => {
+    const db = createFreshDb();
+    runMigrations(db);
+
+    const info = db.pragma('table_info(workspaces)') as any[];
+    const agentTypeCol = info.find((c) => c.name === 'agent_type');
+    expect(agentTypeCol).toBeDefined();
+    expect(agentTypeCol.dflt_value).toBe("'claude-code'");
+
+    // Verify default value works
+    db.prepare("INSERT INTO projects (id, name, path) VALUES ('p1', 'Test', '/test')").run();
+    db.prepare("INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'p1', 'WS', 'main')").run();
+    const ws = db.prepare("SELECT agent_type FROM workspaces WHERE id = 'ws1'").get() as any;
+    expect(ws.agent_type).toBe('claude-code');
 
     db.close();
   });
