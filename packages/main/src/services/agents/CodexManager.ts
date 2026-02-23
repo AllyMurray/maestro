@@ -10,6 +10,7 @@ export class CodexManager extends BaseAgentManager {
 
   private process: ChildProcess | null = null;
   private buffer = '';
+  private _opts: AgentOpts = {};
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -25,14 +26,9 @@ export class CodexManager extends BaseAgentManager {
 
   async start(workspacePath: string, opts: AgentOpts): Promise<void> {
     this._workspacePath = workspacePath;
+    this._opts = opts;
     this.setStatus('starting');
-
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
-    if (opts.apiKey) {
-      env.OPENAI_API_KEY = opts.apiKey;
-    }
-
-    this.setStatus('running');
+    this.setStatus('waiting');
     logger.info(`Codex started in ${workspacePath}`);
   }
 
@@ -43,9 +39,17 @@ export class CodexManager extends BaseAgentManager {
 
     this.setStatus('running');
 
-    const args: string[] = ['--quiet', prompt];
+    const args: string[] = ['exec', '--json', '-a', 'never'];
+    if (this._workspacePath) args.push('-C', this._workspacePath);
+    if (this._opts.model) args.push('-m', this._opts.model);
+    args.push(prompt); // positional, must be last
 
     const env: Record<string, string> = { ...process.env as Record<string, string> };
+    if (this._opts.apiKey) {
+      env.OPENAI_API_KEY = this._opts.apiKey;
+    }
+
+    logger.info(`Spawning: ${this.command} ${args.join(' ')}`);
 
     this.process = spawn(this.command, args, {
       cwd: this._workspacePath!,
@@ -54,6 +58,7 @@ export class CodexManager extends BaseAgentManager {
     });
 
     this.buffer = '';
+    let stderrBuffer = '';
 
     this.process.stdout?.on('data', (data: Buffer) => {
       this.buffer += data.toString();
@@ -61,23 +66,31 @@ export class CodexManager extends BaseAgentManager {
     });
 
     this.process.stderr?.on('data', (data: Buffer) => {
-      const text = data.toString().trim();
-      if (text) {
-        logger.debug(`[codex stderr] ${text}`);
+      const text = data.toString();
+      stderrBuffer += text;
+      if (text.trim()) {
+        logger.debug(`[codex stderr] ${text.trim()}`);
       }
     });
 
     this.process.on('close', (code) => {
       // Flush remaining buffer
       if (this.buffer.trim()) {
-        this.emitOutput('text', this.buffer.trim());
+        try {
+          const msg = JSON.parse(this.buffer.trim());
+          this.handleMessage(msg);
+        } catch {
+          // Non-JSON remainder, log and discard
+          logger.debug(`[codex] Non-JSON trailing buffer: ${this.buffer.trim()}`);
+        }
         this.buffer = '';
       }
       if (code === 0) {
         this.setStatus('waiting');
       } else {
         this.setStatus('error');
-        this.emit('error', new Error(`Codex exited with code ${code}`));
+        const errMsg = stderrBuffer.trim() || `Codex exited with code ${code}`;
+        this.emit('error', new Error(errMsg));
       }
       this.process = null;
     });
@@ -99,8 +112,8 @@ export class CodexManager extends BaseAgentManager {
         const msg = JSON.parse(line);
         this.handleMessage(msg);
       } catch {
-        // Plain text output
-        this.emitOutput('text', line);
+        // With --json all real output is JSON; log non-JSON lines for diagnostics
+        logger.debug(`[codex] Non-JSON line: ${line}`);
       }
     }
   }
@@ -109,32 +122,63 @@ export class CodexManager extends BaseAgentManager {
     const type = msg.type as string;
 
     switch (type) {
-      case 'message': {
-        const content = msg.content as string;
-        if (content) {
-          this.emitOutput('text', content);
+      case 'thread.started': {
+        const threadId = msg.thread_id as string;
+        if (threadId) {
+          this._sessionId = threadId;
+          this.emit('session_id', threadId);
         }
         break;
       }
 
-      case 'function_call': {
-        this.emitOutput('tool_call', JSON.stringify(msg), {
-          toolName: msg.name as string,
-        });
+      case 'item.completed': {
+        const item = msg.item as Record<string, unknown>;
+        if (!item) break;
+
+        const itemType = item.type as string;
+
+        if (itemType === 'agent_message') {
+          const content = item.content as Array<Record<string, unknown>>;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === 'output_text' && block.text) {
+                this.emitOutput('text', block.text as string);
+              }
+            }
+          }
+        } else if (itemType === 'command_execution') {
+          this.emitOutput('tool_call', JSON.stringify({
+            command: item.command,
+            args: item.args,
+          }), {
+            toolName: 'command_execution',
+          });
+          if (item.output != null) {
+            this.emitOutput('tool_result', String(item.output), {
+              toolName: 'command_execution',
+              exitCode: item.exit_code,
+            });
+          }
+        } else if (itemType === 'file_change') {
+          this.emitOutput('tool_call', JSON.stringify({
+            file: item.file,
+            action: item.action,
+          }), {
+            toolName: 'file_change',
+          });
+        }
         break;
       }
 
-      case 'function_call_output': {
-        this.emitOutput('tool_result', msg.output as string, {
-          toolName: msg.name as string,
-        });
+      case 'turn.completed': {
+        logger.debug('[codex] Turn completed');
         break;
       }
 
-      default: {
-        // Raw text content
-        if (msg.content) {
-          this.emitOutput('text', String(msg.content));
+      case 'error': {
+        const message = msg.message as string;
+        if (message) {
+          this.emitOutput('error', message);
         }
         break;
       }
