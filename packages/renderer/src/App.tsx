@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppShell, Text, Group, Box, ActionIcon, Tooltip } from '@mantine/core';
+import { Group, Box, ActionIcon, Tooltip, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { spotlight } from '@mantine/spotlight';
 import { notifications } from '@mantine/notifications';
-import { IconSettings, IconLayoutSidebar, IconPlus } from './components/Icons';
+import { IconSettings, IconLayoutSidebar, IconPlus, IconPanelRight } from './components/Icons';
+import { ThreeColumnLayout } from './components/ThreeColumnLayout';
 import { Sidebar } from './components/Sidebar';
 import { WelcomeView } from './components/WelcomeView';
-import { WorkspaceView } from './components/WorkspaceView';
+import { CenterPanel } from './components/CenterPanel';
+import { RightPanel } from './components/RightPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { SettingsDialog } from './components/SettingsDialog';
 import { WorkspaceCreator } from './components/WorkspaceCreator';
@@ -26,14 +27,14 @@ export default function App() {
   const activeProjectId = useAppStore((s) => s.activeProjectId);
   const workspaces = useAppStore((s) => s.workspaces);
   const projects = useAppStore((s) => s.projects);
+  const rightPanelOpen = useAppStore((s) => s.rightPanelOpen);
+  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel);
   const setProjects = useAppStore((s) => s.setProjects);
   const setWorkspaces = useAppStore((s) => s.setWorkspaces);
   const addWorkspace = useAppStore((s) => s.addWorkspace);
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
-  const setActiveWorkspaceTab = useAppStore((s) => s.setActiveWorkspaceTab);
   const removeProject = useAppStore((s) => s.removeProject);
   const removeWorkspace = useAppStore((s) => s.removeWorkspace);
-
   const addProject = useAppStore((s) => s.addProject);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
 
@@ -50,13 +51,17 @@ export default function App() {
         name,
         path: dirPath,
       });
-      addProject(project);
+
+      const existingInStore = projects.find((p) => p.id === project.id);
+      if (!existingInStore) {
+        addProject(project);
+        notifications.show({
+          title: 'Project added',
+          message: name,
+          color: 'green',
+        });
+      }
       setActiveProject(project.id);
-      notifications.show({
-        title: 'Project added',
-        message: name,
-        color: 'green',
-      });
     } catch (err) {
       notifications.show({
         title: 'Failed to add project',
@@ -64,7 +69,7 @@ export default function App() {
         color: 'red',
       });
     }
-  }, [addProject, setActiveProject]);
+  }, [projects, addProject, setActiveProject]);
 
   // Load projects on startup
   useEffect(() => {
@@ -118,18 +123,6 @@ export default function App() {
     setZenMode((z) => !z);
   }, []);
 
-  const handleCreatePR = useCallback(() => {
-    if (activeWorkspaceId) {
-      setActiveWorkspaceTab('pr');
-    }
-  }, [activeWorkspaceId, setActiveWorkspaceTab]);
-
-  const handleOpenDiff = useCallback(() => {
-    if (activeWorkspaceId) {
-      setActiveWorkspaceTab('diff');
-    }
-  }, [activeWorkspaceId, setActiveWorkspaceTab]);
-
   const handleDeleteProject = useCallback(
     async (id: string) => {
       if (!confirm('Delete this project? Workspaces will also be removed.')) return;
@@ -176,97 +169,108 @@ export default function App() {
 
   useKeyboardShortcuts({
     toggleSidebar,
-    createPR: handleCreatePR,
-    openDiff: handleOpenDiff,
+    toggleRightPanel,
     newWorkspace: openWsCreator,
     zenMode: handleToggleZen,
   });
 
   const showSidebar = sidebarOpen && !zenMode;
+  const showRight = rightPanelOpen && !zenMode && !!activeWorkspace;
 
   return (
     <>
       <CommandPalette
         onToggleSidebar={toggleSidebar}
+        onToggleRightPanel={toggleRightPanel}
         onOpenSettings={openSettings}
         onCreateWorkspace={openWsCreator}
-        onCreatePR={handleCreatePR}
-        onOpenDiff={handleOpenDiff}
       />
 
-      <AppShell
-        navbar={{
-          width: 260,
-          breakpoint: 'sm',
-          collapsed: { desktop: !showSidebar, mobile: !showSidebar },
+      <Box
+        style={{
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--mantine-color-dark-7)',
         }}
-        padding={0}
       >
-        <AppShell.Navbar bg="dark.8" style={{ borderRight: '1px solid var(--mantine-color-dark-5)' }}>
-          <Sidebar
-            onAddProject={handleAddProject}
-            onCreateWorkspace={openWsCreator}
-            onDeleteProject={handleDeleteProject}
-            onDeleteWorkspace={handleDeleteWorkspace}
-          />
-        </AppShell.Navbar>
-
-        <AppShell.Main
+        {/* Titlebar / toolbar */}
+        <Group
+          h={52}
+          px="md"
+          justify="space-between"
+          className="titlebar-drag"
           style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            background: 'var(--mantine-color-dark-7)',
+            borderBottom: '1px solid var(--mantine-color-dark-5)',
+            flexShrink: 0,
+            paddingLeft: showSidebar ? 'var(--mantine-spacing-md)' : 80,
           }}
         >
-          {/* Titlebar / toolbar */}
-          <Group
-            h={52}
-            px="md"
-            justify="space-between"
-            className="titlebar-drag"
-            style={{
-              borderBottom: '1px solid var(--mantine-color-dark-5)',
-              flexShrink: 0,
-              paddingLeft: showSidebar ? 'var(--mantine-spacing-md)' : 80,
-            }}
-          >
-            <Group gap="xs" className="titlebar-no-drag">
-              <Tooltip label="Toggle sidebar (Cmd+B)" position="bottom">
-                <ActionIcon variant="subtle" color="gray" onClick={toggleSidebar}>
-                  <IconLayoutSidebar size={18} />
-                </ActionIcon>
-              </Tooltip>
-              <Text size="sm" fw={600} c="dimmed">
-                {activeWorkspace ? activeWorkspace.name : 'Maestro'}
-              </Text>
-            </Group>
-            <Group gap="xs" className="titlebar-no-drag">
-              {activeProjectId && (
-                <Tooltip label="New workspace (Cmd+N)" position="bottom">
-                  <ActionIcon variant="subtle" color="gray" onClick={openWsCreator}>
-                    <IconPlus size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              <Tooltip label="Settings" position="bottom">
-                <ActionIcon variant="subtle" color="gray" onClick={openSettings}>
-                  <IconSettings size={18} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
+          <Group gap="xs" className="titlebar-no-drag">
+            <Tooltip label="Toggle sidebar (Cmd+B)" position="bottom">
+              <ActionIcon variant="subtle" color="gray" onClick={toggleSidebar}>
+                <IconLayoutSidebar size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Text size="sm" fw={600} c="dimmed">
+              {activeWorkspace ? activeWorkspace.name : 'Maestro'}
+            </Text>
           </Group>
-
-          {/* Main content */}
-          <Box style={{ flex: 1, overflow: 'hidden' }}>
-            {activeWorkspace && activeProject ? (
-              <WorkspaceView workspace={activeWorkspace} project={activeProject} />
-            ) : (
-              <WelcomeView onAddProject={handleAddProject} />
+          <Group gap="xs" className="titlebar-no-drag">
+            {activeProjectId && (
+              <Tooltip label="New workspace (Cmd+N)" position="bottom">
+                <ActionIcon variant="subtle" color="gray" onClick={openWsCreator}>
+                  <IconPlus size={18} />
+                </ActionIcon>
+              </Tooltip>
             )}
-          </Box>
-        </AppShell.Main>
-      </AppShell>
+            {activeWorkspace && (
+              <Tooltip label="Toggle right panel (Cmd+J)" position="bottom">
+                <ActionIcon variant="subtle" color="gray" onClick={toggleRightPanel}>
+                  <IconPanelRight size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            <Tooltip label="Settings" position="bottom">
+              <ActionIcon variant="subtle" color="gray" onClick={openSettings}>
+                <IconSettings size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </Group>
+
+        {/* Main 3-column layout */}
+        <Box style={{ flex: 1, overflow: 'hidden' }}>
+          <ThreeColumnLayout
+            showLeft={showSidebar}
+            showRight={showRight}
+            left={
+              <Sidebar
+                onAddProject={handleAddProject}
+                onCreateWorkspace={openWsCreator}
+                onDeleteProject={handleDeleteProject}
+                onDeleteWorkspace={handleDeleteWorkspace}
+              />
+            }
+            center={
+              activeWorkspace && activeProject ? (
+                <CenterPanel
+                  workspace={activeWorkspace}
+                  project={activeProject}
+                  onDeleteWorkspace={handleDeleteWorkspace}
+                />
+              ) : (
+                <WelcomeView onAddProject={handleAddProject} />
+              )
+            }
+            right={
+              activeWorkspace && activeProject ? (
+                <RightPanel workspace={activeWorkspace} project={activeProject} />
+              ) : null
+            }
+          />
+        </Box>
+      </Box>
 
       <SettingsDialog opened={settingsOpen} onClose={closeSettings} />
 

@@ -32,6 +32,13 @@ export function registerProjectHandlers(ipcMain: IpcMain): void {
       }
 
       const db = getDb();
+
+      // If project with this path already exists, return it
+      const existing = db.prepare('SELECT * FROM projects WHERE path = ?').get(data.path);
+      if (existing) {
+        return mapRow<Project>(existing as Record<string, unknown>);
+      }
+
       const id = uuid();
       db.prepare(
         `INSERT INTO projects (id, name, path, git_platform, default_branch)
