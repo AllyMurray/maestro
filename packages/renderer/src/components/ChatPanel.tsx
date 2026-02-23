@@ -150,6 +150,8 @@ export function ChatPanel({
   // Load message history when sessionId changes
   useEffect(() => {
     if (!sessionId) return;
+    if (messages.length > 0) return;
+    if (agentStatus === 'running' || agentStatus === 'waiting') return;
     ipc
       .invoke<Message[]>(IPC_CHANNELS.MESSAGE_LIST, sessionId)
       .then((history) => {
@@ -172,7 +174,7 @@ export function ChatPanel({
         }
       })
       .catch(() => {});
-  }, [sessionId]);
+  }, [agentStatus, messages.length, sessionId]);
 
   // Auto scroll to bottom
   useEffect(() => {

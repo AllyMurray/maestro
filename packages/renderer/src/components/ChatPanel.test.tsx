@@ -65,6 +65,19 @@ describe('ChatPanel', () => {
     });
   });
 
+  it('does not load history while agent is actively running', () => {
+    renderWithProviders(
+      <ChatPanel
+        sessionId="s1"
+        sessionIdRef={{ current: 's1' }}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    expect(window.maestro.invoke).not.toHaveBeenCalled();
+  });
+
   it('does not emit duplicate React keys when Date.now collides', async () => {
     const sessionIdRef = { current: 'session-1' as string | null };
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1771869307165);
