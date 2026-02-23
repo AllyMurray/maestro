@@ -29,7 +29,13 @@ export function SettingsDialog({ opened, onClose }: SettingsDialogProps) {
   const [defaultAgent, setDefaultAgent] = useState<string | null>('claude-code');
   const [claudeModel, setClaudeModel] = useState('');
   const [availableAgents, setAvailableAgents] = useState<
-    Array<{ type: string; displayName: string; available: boolean; version?: string }>
+    Array<{
+      type: string;
+      displayName: string;
+      available: boolean;
+      version?: string;
+      reason?: string;
+    }>
   >([]);
 
   useEffect(() => {
@@ -87,9 +93,19 @@ export function SettingsDialog({ opened, onClose }: SettingsDialogProps) {
                     <Badge
                       size="xs"
                       variant="light"
-                      color={agent.available ? 'green' : 'red'}
+                      color={
+                        agent.available
+                          ? 'green'
+                          : agent.reason?.startsWith('Upgrade required')
+                            ? 'yellow'
+                            : 'red'
+                      }
                     >
-                      {agent.available ? 'Installed' : 'Not found'}
+                      {agent.available
+                        ? 'Installed'
+                        : agent.reason?.startsWith('Upgrade required')
+                          ? 'Upgrade required'
+                          : 'Not found'}
                     </Badge>
                   </Group>
                   {agent.version && (
@@ -98,6 +114,11 @@ export function SettingsDialog({ opened, onClose }: SettingsDialogProps) {
                     </Text>
                   )}
                 </Group>
+                {!agent.available && agent.reason && (
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {agent.reason}
+                  </Text>
+                )}
               </Paper>
             ))}
 

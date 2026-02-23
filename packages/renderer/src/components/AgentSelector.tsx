@@ -5,6 +5,7 @@ interface AgentOption {
   value: AgentType;
   label: string;
   available: boolean;
+  reason?: string;
 }
 
 interface AgentSelectorProps {
@@ -24,7 +25,7 @@ export function AgentSelector({ value, onChange, availableAgents }: AgentSelecto
 
   const data = agents.map((a) => ({
     value: a.value,
-    label: `${a.label}${a.available ? '' : ' (not found)'}`,
+    label: `${a.label}${a.available ? '' : ` (${a.reason || 'unavailable'})`}`,
     disabled: !a.available,
   }));
 

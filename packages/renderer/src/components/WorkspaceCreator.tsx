@@ -30,18 +30,23 @@ export function WorkspaceCreator({
   const [agentType, setAgentType] = useState<AgentType | null>(null);
   const [targetBranch, setTargetBranch] = useState(defaultBranch);
   const [availableAgents, setAvailableAgents] = useState<
-    { value: AgentType; label: string; available: boolean }[] | undefined
+    { value: AgentType; label: string; available: boolean; reason?: string }[] | undefined
   >();
 
   useEffect(() => {
     if (!opened) return;
     ipc
-      .invoke<{ type: AgentType; displayName: string; available: boolean }[]>(
+      .invoke<{ type: AgentType; displayName: string; available: boolean; reason?: string }[]>(
         IPC_CHANNELS.AGENT_LIST_AVAILABLE,
       )
       .then((agents) =>
         setAvailableAgents(
-          agents.map((a) => ({ value: a.type, label: a.displayName, available: a.available })),
+          agents.map((a) => ({
+            value: a.type,
+            label: a.displayName,
+            available: a.available,
+            reason: a.reason,
+          })),
         ),
       )
       .catch(() => {});
@@ -67,12 +72,7 @@ export function WorkspaceCreator({
   }, []);
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title="New Workspace"
-      size="md"
-    >
+    <Modal opened={opened} onClose={onClose} title="New Workspace" size="md">
       <Stack gap="md">
         <TextInput
           label="Workspace name"
@@ -97,16 +97,17 @@ export function WorkspaceCreator({
           onChange={(e) => setTargetBranch(e.currentTarget.value)}
         />
 
-        <AgentSelector value={agentType} onChange={setAgentType} availableAgents={availableAgents} />
+        <AgentSelector
+          value={agentType}
+          onChange={setAgentType}
+          availableAgents={availableAgents}
+        />
 
         <Group justify="flex-end" mt="md">
           <Button variant="subtle" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!name || !branchName || !agentType}
-          >
+          <Button onClick={handleSubmit} disabled={!name || !branchName || !agentType}>
             Create Workspace
           </Button>
         </Group>
