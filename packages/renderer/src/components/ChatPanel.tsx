@@ -21,11 +21,23 @@ interface ChatPanelProps {
   onStop?: () => void;
 }
 
-export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop }: ChatPanelProps) {
+export function ChatPanel({
+  sessionId,
+  sessionIdRef,
+  agentStatus,
+  onSend,
+  onStop,
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamBuffer, setStreamBuffer] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageSeqRef = useRef(0);
   const isRunning = agentStatus === 'running';
+
+  const nextMessageId = useCallback((prefix: ChatMessage['role']) => {
+    messageSeqRef.current += 1;
+    return `${prefix}-${Date.now()}-${messageSeqRef.current}`;
+  }, []);
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
@@ -34,7 +46,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
   const handleSend = useCallback(
     (text: string) => {
       addMessage({
-        id: `user-${Date.now()}`,
+        id: nextMessageId('user'),
         role: 'user',
         content: text,
         timestamp: new Date().toISOString(),
@@ -43,14 +55,14 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
       Promise.resolve(onSend(text)).catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
         addMessage({
-          id: `error-${Date.now()}`,
+          id: nextMessageId('error'),
           role: 'error',
           content: `Failed to send: ${message}`,
           timestamp: new Date().toISOString(),
         });
       });
     },
-    [addMessage, onSend],
+    [addMessage, nextMessageId, onSend],
   );
 
   // Listen for agent output via IPC — registered once on mount, uses ref for session filtering
@@ -73,7 +85,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
           setStreamBuffer((prev) => {
             if (prev) {
               addMessage({
-                id: `assistant-${Date.now()}`,
+                id: nextMessageId('assistant'),
                 role: 'assistant',
                 content: prev,
                 timestamp: output.timestamp,
@@ -82,7 +94,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
             return '';
           });
           addMessage({
-            id: `tool-${Date.now()}`,
+            id: nextMessageId('tool_call'),
             role: 'tool_call',
             content: output.content,
             metadata: output.metadata,
@@ -91,7 +103,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
           break;
         case 'tool_result':
           addMessage({
-            id: `result-${Date.now()}`,
+            id: nextMessageId('tool_result'),
             role: 'tool_result',
             content: output.content,
             metadata: output.metadata,
@@ -100,7 +112,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
           break;
         case 'error':
           addMessage({
-            id: `error-${Date.now()}`,
+            id: nextMessageId('error'),
             role: 'error',
             content: output.content,
             timestamp: output.timestamp,
@@ -118,7 +130,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
         setStreamBuffer((prev) => {
           if (prev) {
             addMessage({
-              id: `assistant-${Date.now()}`,
+              id: nextMessageId('assistant'),
               role: 'assistant',
               content: prev,
               timestamp: new Date().toISOString(),
@@ -133,7 +145,7 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
       unsubOutput();
       unsubStatus();
     };
-  }, [addMessage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addMessage, nextMessageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load message history when sessionId changes
   useEffect(() => {
@@ -144,7 +156,14 @@ export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop
         if (history && history.length > 0) {
           const restored: ChatMessage[] = history.map((m) => ({
             id: `history-${m.id}`,
-            role: m.role === 'user' ? 'user' : m.role === 'assistant' ? 'assistant' : m.role === 'tool_call' ? 'tool_call' : 'tool_result',
+            role:
+              m.role === 'user'
+                ? 'user'
+                : m.role === 'assistant'
+                  ? 'assistant'
+                  : m.role === 'tool_call'
+                    ? 'tool_call'
+                    : 'tool_result',
             content: m.content,
             metadata: m.metadataJson ? JSON.parse(m.metadataJson) : undefined,
             timestamp: m.createdAt,
@@ -226,15 +245,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         maxWidth: '85%',
       }}
     >
-      <Paper
-        p="sm"
-        radius="md"
-        bg={isUser ? 'brand.8' : isError ? 'red.9' : 'dark.6'}
-      >
-        <Text
-          size="sm"
-          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-        >
+      <Paper p="sm" radius="md" bg={isUser ? 'brand.8' : isError ? 'red.9' : 'dark.6'}>
+        <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {message.content}
         </Text>
       </Paper>

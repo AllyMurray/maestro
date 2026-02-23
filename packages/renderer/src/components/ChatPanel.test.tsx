@@ -10,13 +10,15 @@ describe('ChatPanel', () => {
     onHandlers = {};
     (window.maestro.invoke as any).mockResolvedValue([]);
     // Capture IPC event handlers so we can simulate events
-    (window.maestro.on as any).mockImplementation((channel: string, cb: (...args: unknown[]) => void) => {
-      if (!onHandlers[channel]) onHandlers[channel] = [];
-      onHandlers[channel].push(cb);
-      return () => {
-        onHandlers[channel] = onHandlers[channel].filter((h) => h !== cb);
-      };
-    });
+    (window.maestro.on as any).mockImplementation(
+      (channel: string, cb: (...args: unknown[]) => void) => {
+        if (!onHandlers[channel]) onHandlers[channel] = [];
+        onHandlers[channel].push(cb);
+        return () => {
+          onHandlers[channel] = onHandlers[channel].filter((h) => h !== cb);
+        };
+      },
+    );
   });
 
   function fireEvent(channel: string, data: unknown) {
@@ -27,23 +29,107 @@ describe('ChatPanel', () => {
 
   it('renders the chat input area', () => {
     renderWithProviders(
-      <ChatPanel sessionId={null} sessionIdRef={{ current: null }} agentStatus="idle" onSend={() => {}} />,
+      <ChatPanel
+        sessionId={null}
+        sessionIdRef={{ current: null }}
+        agentStatus="idle"
+        onSend={() => {}}
+      />,
     );
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
   it('loads message history when sessionId provided', async () => {
     (window.maestro.invoke as any).mockResolvedValue([
-      { id: 1, sessionId: 's1', role: 'user', content: 'Hello from history', metadataJson: '{}', createdAt: '2024-01-01T00:00:00Z' },
+      {
+        id: 1,
+        sessionId: 's1',
+        role: 'user',
+        content: 'Hello from history',
+        metadataJson: '{}',
+        createdAt: '2024-01-01T00:00:00Z',
+      },
     ]);
 
     renderWithProviders(
-      <ChatPanel sessionId="s1" sessionIdRef={{ current: 's1' }} agentStatus="idle" onSend={() => {}} />,
+      <ChatPanel
+        sessionId="s1"
+        sessionIdRef={{ current: 's1' }}
+        agentStatus="idle"
+        onSend={() => {}}
+      />,
     );
 
     await waitFor(() => {
       expect(screen.getByText('Hello from history')).toBeInTheDocument();
     });
+  });
+
+  it('does not emit duplicate React keys when Date.now collides', async () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1771869307165);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'tool_call',
+          content: '{"name":"Read","id":"tool-1"}',
+          metadata: { toolName: 'Read' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'tool_result',
+          content: 'first result',
+          metadata: { toolName: 'Read' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'tool_call',
+          content: '{"name":"Read","id":"tool-2"}',
+          metadata: { toolName: 'Read' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'tool_result',
+          content: 'second result',
+          metadata: { toolName: 'Read' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('first result')).toBeInTheDocument();
+      expect(screen.getByText('second result')).toBeInTheDocument();
+    });
+
+    const duplicateKeyCalls = errorSpy.mock.calls.filter((call) =>
+      String(call[0]).includes('Encountered two children with the same key'),
+    );
+    expect(duplicateKeyCalls).toHaveLength(0);
+
+    nowSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   // ─── Bug 2 proof: sessionIdRef race condition fix ──────────────────
@@ -55,7 +141,12 @@ describe('ChatPanel', () => {
       const sessionIdRef = { current: null as string | null };
 
       const { rerender } = renderWithProviders(
-        <ChatPanel sessionId={null} sessionIdRef={sessionIdRef} agentStatus="running" onSend={() => {}} />,
+        <ChatPanel
+          sessionId={null}
+          sessionIdRef={sessionIdRef}
+          agentStatus="running"
+          onSend={() => {}}
+        />,
       );
 
       // CenterPanel sets the ref synchronously (before React re-renders)
@@ -80,13 +171,22 @@ describe('ChatPanel', () => {
       const sessionIdRef = { current: 'session-A' };
 
       renderWithProviders(
-        <ChatPanel sessionId="session-A" sessionIdRef={sessionIdRef} agentStatus="running" onSend={() => {}} />,
+        <ChatPanel
+          sessionId="session-A"
+          sessionIdRef={sessionIdRef}
+          agentStatus="running"
+          onSend={() => {}}
+        />,
       );
 
       act(() => {
         fireEvent('agent:output', {
           sessionId: 'session-OTHER',
-          output: { type: 'text', content: 'wrong session text', timestamp: new Date().toISOString() },
+          output: {
+            type: 'text',
+            content: 'wrong session text',
+            timestamp: new Date().toISOString(),
+          },
         });
       });
 
@@ -97,13 +197,22 @@ describe('ChatPanel', () => {
       const sessionIdRef = { current: 'session-fast' as string | null };
 
       renderWithProviders(
-        <ChatPanel sessionId={null} sessionIdRef={sessionIdRef} agentStatus="running" onSend={() => {}} />,
+        <ChatPanel
+          sessionId={null}
+          sessionIdRef={sessionIdRef}
+          agentStatus="running"
+          onSend={() => {}}
+        />,
       );
 
       act(() => {
         fireEvent('agent:output', {
           sessionId: 'session-fast',
-          output: { type: 'text', content: 'streamed response', timestamp: new Date().toISOString() },
+          output: {
+            type: 'text',
+            content: 'streamed response',
+            timestamp: new Date().toISOString(),
+          },
         });
       });
 
