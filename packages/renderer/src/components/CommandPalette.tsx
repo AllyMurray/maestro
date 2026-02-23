@@ -1,35 +1,33 @@
 import { Spotlight, SpotlightActionData } from '@mantine/spotlight';
-import { Group, Text } from '@mantine/core';
 import {
   IconFolder,
   IconPlus,
-  IconGitPullRequest,
   IconSettings,
   IconTerminal,
   IconSearch,
   IconLayoutSidebar,
+  IconPanelRight,
 } from './Icons';
 import { useAppStore } from '../stores/appStore';
 
 interface CommandPaletteProps {
   onToggleSidebar: () => void;
+  onToggleRightPanel: () => void;
   onOpenSettings: () => void;
   onCreateWorkspace: () => void;
-  onCreatePR: () => void;
-  onOpenDiff: () => void;
 }
 
 export function CommandPalette({
   onToggleSidebar,
+  onToggleRightPanel,
   onOpenSettings,
   onCreateWorkspace,
-  onCreatePR,
-  onOpenDiff,
 }: CommandPaletteProps) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
+  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab);
 
   const actions: SpotlightActionData[] = [
     {
@@ -40,18 +38,18 @@ export function CommandPalette({
       onClick: onCreateWorkspace,
     },
     {
-      id: 'create-pr',
-      label: 'Create Pull Request',
-      description: 'Create a PR/MR for the current workspace',
-      leftSection: <IconGitPullRequest size={18} />,
-      onClick: onCreatePR,
+      id: 'show-changes',
+      label: 'Show Changes',
+      description: 'View file changes in the right panel',
+      leftSection: <IconSearch size={18} />,
+      onClick: () => setRightPanelTab('changes'),
     },
     {
-      id: 'open-diff',
-      label: 'Open Diff Viewer',
-      description: 'View changes in the current workspace',
-      leftSection: <IconSearch size={18} />,
-      onClick: onOpenDiff,
+      id: 'show-files',
+      label: 'Show Files',
+      description: 'Browse files in the right panel',
+      leftSection: <IconFolder size={18} />,
+      onClick: () => setRightPanelTab('files'),
     },
     {
       id: 'toggle-sidebar',
@@ -59,6 +57,13 @@ export function CommandPalette({
       description: 'Show or hide the sidebar',
       leftSection: <IconLayoutSidebar size={18} />,
       onClick: onToggleSidebar,
+    },
+    {
+      id: 'toggle-right-panel',
+      label: 'Toggle Right Panel',
+      description: 'Show or hide the inspector panel',
+      leftSection: <IconPanelRight size={18} />,
+      onClick: onToggleRightPanel,
     },
     {
       id: 'settings',
@@ -76,7 +81,7 @@ export function CommandPalette({
       onClick: () => setActiveProject(p.id),
     })),
     ...workspaces
-      .filter((w) => w.status === 'active')
+      .filter((w) => w.status !== 'cancelled')
       .map((w) => ({
         id: `workspace-${w.id}`,
         label: w.name,

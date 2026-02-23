@@ -3,16 +3,10 @@ import {
   Stack,
   Group,
   Text,
-  Paper,
-  Badge,
   ScrollArea,
   NavLink,
   Box,
-  Code,
-  ActionIcon,
-  Tooltip,
 } from '@mantine/core';
-import { IconCheck, IconPlus, IconX } from './Icons';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
 import type { DiffFile } from '@maestro/shared';
@@ -68,36 +62,8 @@ export function DiffViewer({ workspacePath, base }: DiffViewerProps) {
     loadDiff();
   }, [loadDiff]);
 
-  const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
-  const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
-
   return (
     <Stack h="100%" gap={0}>
-      {/* Header */}
-      <Group
-        h={44}
-        px="md"
-        justify="space-between"
-        style={{ borderBottom: '1px solid var(--mantine-color-dark-5)', flexShrink: 0 }}
-      >
-        <Group gap="sm">
-          <Text size="sm" fw={600}>
-            Changes
-          </Text>
-          <Badge size="xs" variant="light">
-            {files.length} files
-          </Badge>
-        </Group>
-        <Group gap={4}>
-          <Text size="xs" c="green">
-            +{totalAdditions}
-          </Text>
-          <Text size="xs" c="red">
-            -{totalDeletions}
-          </Text>
-        </Group>
-      </Group>
-
       <Group style={{ flex: 1, overflow: 'hidden' }} gap={0} align="stretch">
         {/* File list */}
         <ScrollArea

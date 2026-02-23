@@ -1,8 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Stack, Paper, Text, ScrollArea, Box, Group, Loader, Code, ActionIcon } from '@mantine/core';
-import { AgentStatusBadge } from './AgentStatusBadge';
+import { Stack, Paper, Text, ScrollArea, Box, Group, Loader, Code } from '@mantine/core';
 import { ChatInput } from './ChatInput';
-import { IconPlayerStop } from './Icons';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
 import type { AgentOutput, AgentStatus, Message } from '@maestro/shared';
@@ -18,7 +16,7 @@ interface ChatMessage {
 interface ChatPanelProps {
   sessionId: string | null;
   agentStatus: AgentStatus;
-  onSend: (prompt: string) => void;
+  onSend: (prompt: string) => void | Promise<void>;
   onStop?: () => void;
 }
 
@@ -26,7 +24,13 @@ export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelP
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamBuffer, setStreamBuffer] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(sessionId);
   const isRunning = agentStatus === 'running';
+
+  // Keep ref in sync with prop
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
@@ -41,21 +45,29 @@ export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelP
         timestamp: new Date().toISOString(),
       });
       setStreamBuffer('');
-      onSend(text);
+      Promise.resolve(onSend(text)).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        addMessage({
+          id: `error-${Date.now()}`,
+          role: 'error',
+          content: `Failed to send: ${message}`,
+          timestamp: new Date().toISOString(),
+        });
+      });
     },
     [addMessage, onSend],
   );
 
-  // Listen for agent output via IPC
+  // Listen for agent output via IPC — registered once on mount, uses ref for session filtering
   useEffect(() => {
-    if (!sessionId || !window.maestro) return;
+    if (!window.maestro) return;
 
     const unsubOutput = window.maestro.on('agent:output', (data: unknown) => {
       const { sessionId: sid, output } = data as {
         sessionId: string;
         output: AgentOutput;
       };
-      if (sid !== sessionId) return;
+      if (!sessionIdRef.current || sid !== sessionIdRef.current) return;
 
       switch (output.type) {
         case 'text':
@@ -104,7 +116,7 @@ export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelP
 
     const unsubStatus = window.maestro.on('agent:status', (data: unknown) => {
       const { sessionId: sid, status } = data as { sessionId: string; status: AgentStatus };
-      if (sid !== sessionId) return;
+      if (!sessionIdRef.current || sid !== sessionIdRef.current) return;
 
       // When agent finishes, flush buffer
       if (status === 'waiting' || status === 'stopped') {
@@ -126,7 +138,7 @@ export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelP
       unsubOutput();
       unsubStatus();
     };
-  }, [sessionId, addMessage]);
+  }, [addMessage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load message history when sessionId changes
   useEffect(() => {
@@ -157,32 +169,6 @@ export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelP
 
   return (
     <Stack h="100%" gap={0}>
-      {/* Chat header */}
-      <Group
-        h={44}
-        px="md"
-        justify="space-between"
-        style={{ borderBottom: '1px solid var(--mantine-color-dark-5)', flexShrink: 0 }}
-      >
-        <Text size="sm" fw={600}>
-          Chat
-        </Text>
-        <Group gap="xs">
-          {onStop && (agentStatus === 'running' || agentStatus === 'waiting') && (
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              size="sm"
-              aria-label="Stop agent"
-              onClick={onStop}
-            >
-              <IconPlayerStop size={14} />
-            </ActionIcon>
-          )}
-          <AgentStatusBadge status={agentStatus} />
-        </Group>
-      </Group>
-
       {/* Messages area */}
       <ScrollArea flex={1} viewportRef={scrollRef} p="md">
         <Stack gap="sm">

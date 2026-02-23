@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders, screen, waitFor, userEvent } from '../__test-utils__/render';
+import { renderWithProviders, screen, waitFor } from '../__test-utils__/render';
 import { ChatPanel } from './ChatPanel';
 
 describe('ChatPanel', () => {
@@ -9,42 +9,12 @@ describe('ChatPanel', () => {
     (window.maestro.on as any).mockReturnValue(() => {});
   });
 
-  it('renders Chat header', () => {
+  it('renders the chat input area', () => {
     renderWithProviders(
       <ChatPanel sessionId={null} agentStatus="idle" onSend={() => {}} />,
     );
-    expect(screen.getByText('Chat')).toBeInTheDocument();
-  });
-
-  it('shows stop button when agent is running and onStop provided', () => {
-    renderWithProviders(
-      <ChatPanel sessionId="s1" agentStatus="running" onSend={() => {}} onStop={() => {}} />,
-    );
-    expect(screen.getByLabelText('Stop agent')).toBeInTheDocument();
-  });
-
-  it('hides stop button when agent is idle', () => {
-    renderWithProviders(
-      <ChatPanel sessionId="s1" agentStatus="idle" onSend={() => {}} onStop={() => {}} />,
-    );
-    expect(screen.queryByLabelText('Stop agent')).not.toBeInTheDocument();
-  });
-
-  it('hides stop button when onStop not provided', () => {
-    renderWithProviders(
-      <ChatPanel sessionId="s1" agentStatus="running" onSend={() => {}} />,
-    );
-    expect(screen.queryByLabelText('Stop agent')).not.toBeInTheDocument();
-  });
-
-  it('calls onStop when stop button clicked', async () => {
-    const onStop = vi.fn();
-    renderWithProviders(
-      <ChatPanel sessionId="s1" agentStatus="running" onSend={() => {}} onStop={onStop} />,
-    );
-
-    await userEvent.click(screen.getByLabelText('Stop agent'));
-    expect(onStop).toHaveBeenCalledOnce();
+    // Chat input should be present (textarea or input)
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
   it('loads message history when sessionId provided', async () => {

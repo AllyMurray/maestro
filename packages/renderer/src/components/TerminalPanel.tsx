@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Stack, Group, Text, ActionIcon, Tooltip } from '@mantine/core';
+import { ActionIcon, Tooltip } from '@mantine/core';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -17,11 +17,17 @@ export function TerminalPanel({ workspacePath }: TerminalPanelProps) {
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const terminalIdRef = useRef<string | null>(null);
+  const creatingRef = useRef(false);
+  const dataUnsubRef = useRef<(() => void) | null>(null);
 
   const createNewTerminal = useCallback(async () => {
     // Clean up previous terminal
     if (terminalIdRef.current) {
       ipc.invoke(IPC_CHANNELS.TERMINAL_CLOSE, terminalIdRef.current);
+    }
+    if (dataUnsubRef.current) {
+      dataUnsubRef.current();
+      dataUnsubRef.current = null;
     }
     if (xtermRef.current) {
       xtermRef.current.dispose();
@@ -69,41 +75,47 @@ export function TerminalPanel({ workspacePath }: TerminalPanelProps) {
       fitAddon.fit();
     }
 
-    // Create backend terminal with xterm's dimensions
-    const result = await ipc.invoke<{ id: string }>(IPC_CHANNELS.TERMINAL_CREATE, {
-      workspacePath,
-      cols: xterm.cols,
-      rows: xterm.rows,
+    // Register data listener BEFORE creating the backend terminal
+    // so we don't miss the initial shell prompt.
+    // Accept data optimistically while creating (terminalIdRef is still null).
+    creatingRef.current = true;
+    dataUnsubRef.current = ipc.on(IPC_CHANNELS.TERMINAL_DATA, (payload: unknown) => {
+      const { terminalId: tid, data } = payload as { terminalId: string; data: string };
+      if ((creatingRef.current || tid === terminalIdRef.current) && xtermRef.current) {
+        xtermRef.current.write(data);
+      }
     });
 
-    const newId = result.id;
-    setTerminalId(newId);
-    terminalIdRef.current = newId;
+    try {
+      // Create backend terminal with xterm's dimensions
+      const result = await ipc.invoke<{ id: string }>(IPC_CHANNELS.TERMINAL_CREATE, {
+        workspacePath,
+        cols: xterm.cols,
+        rows: xterm.rows,
+      });
+
+      const newId = result.id;
+      terminalIdRef.current = newId;
+      creatingRef.current = false;
+      setTerminalId(newId);
+    } catch (err) {
+      console.error('Failed to create terminal:', err);
+      xterm.write(`\r\nError creating terminal: ${err}\r\n`);
+      return;
+    }
 
     // Send user input to backend
     xterm.onData((data: string) => {
-      ipc.send(IPC_CHANNELS.TERMINAL_WRITE, { terminalId: newId, data });
+      ipc.send(IPC_CHANNELS.TERMINAL_WRITE, { terminalId: terminalIdRef.current!, data });
     });
 
     // Send resize events to backend
     xterm.onResize(({ cols, rows }: { cols: number; rows: number }) => {
-      ipc.send(IPC_CHANNELS.TERMINAL_RESIZE, { terminalId: newId, cols, rows });
+      ipc.send(IPC_CHANNELS.TERMINAL_RESIZE, { terminalId: terminalIdRef.current!, cols, rows });
     });
 
     xterm.focus();
   }, [workspacePath]);
-
-  // Listen for terminal data from backend
-  useEffect(() => {
-    if (!terminalId) return;
-    const unsub = ipc.on(IPC_CHANNELS.TERMINAL_DATA, (payload: unknown) => {
-      const { terminalId: tid, data } = payload as { terminalId: string; data: string };
-      if (tid === terminalId && xtermRef.current) {
-        xtermRef.current.write(data);
-      }
-    });
-    return unsub;
-  }, [terminalId]);
 
   // Handle resize
   useEffect(() => {
@@ -129,6 +141,10 @@ export function TerminalPanel({ workspacePath }: TerminalPanelProps) {
   useEffect(() => {
     createNewTerminal();
     return () => {
+      if (dataUnsubRef.current) {
+        dataUnsubRef.current();
+        dataUnsubRef.current = null;
+      }
       if (terminalIdRef.current) {
         ipc.invoke(IPC_CHANNELS.TERMINAL_CLOSE, terminalIdRef.current);
         terminalIdRef.current = null;
@@ -141,34 +157,27 @@ export function TerminalPanel({ workspacePath }: TerminalPanelProps) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Stack h="100%" gap={0}>
-      <Group
-        h={36}
-        px="md"
-        justify="space-between"
-        style={{ borderBottom: '1px solid var(--mantine-color-dark-5)', flexShrink: 0 }}
-      >
-        <Text size="xs" fw={600} c="dimmed">
-          Terminal
-        </Text>
-        <Group gap={4}>
-          <Tooltip label="New terminal">
-            <ActionIcon variant="subtle" size="xs" color="gray" onClick={createNewTerminal}>
-              <IconPlus size={12} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Group>
-
+    <div style={{ height: '100%', position: 'relative' }}>
       <div
         ref={termRef}
         style={{
-          flex: 1,
+          height: '100%',
           overflow: 'hidden',
           background: '#0d1117',
           padding: '4px',
         }}
       />
-    </Stack>
+      <Tooltip label="New terminal">
+        <ActionIcon
+          variant="subtle"
+          size="xs"
+          color="gray"
+          onClick={createNewTerminal}
+          style={{ position: 'absolute', top: 4, right: 4, zIndex: 1 }}
+        >
+          <IconPlus size={12} />
+        </ActionIcon>
+      </Tooltip>
+    </div>
   );
 }
