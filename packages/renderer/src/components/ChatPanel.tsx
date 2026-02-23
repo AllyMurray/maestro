@@ -32,6 +32,8 @@ export function ChatPanel({
   const [streamBuffer, setStreamBuffer] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const messageSeqRef = useRef(0);
+  const seenOutputRef = useRef<Map<string, number>>(new Map());
+  const lastSessionIdRef = useRef<string | null>(sessionId);
   const isRunning = agentStatus === 'running';
 
   const nextMessageId = useCallback((prefix: ChatMessage['role']) => {
@@ -40,7 +42,28 @@ export function ChatPanel({
   }, []);
 
   const addMessage = useCallback((msg: ChatMessage) => {
-    setMessages((prev) => [...prev, msg]);
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === msg.role && last.content === msg.content) {
+        return prev;
+      }
+      return [...prev, msg];
+    });
+  }, []);
+
+  const seenOutput = useCallback((output: AgentOutput): boolean => {
+    const outputKey = `${output.type}|${String(output.metadata?.toolName || '')}|${output.content}`;
+    const now = Date.now();
+    const lastSeen = seenOutputRef.current.get(outputKey);
+    if (typeof lastSeen === 'number' && now - lastSeen < 3000) {
+      return true;
+    }
+    seenOutputRef.current.set(outputKey, now);
+    if (seenOutputRef.current.size > 500) {
+      const first = seenOutputRef.current.keys().next().value;
+      if (first) seenOutputRef.current.delete(first);
+    }
+    return false;
   }, []);
 
   const handleSend = useCallback(
@@ -75,6 +98,7 @@ export function ChatPanel({
         output: AgentOutput;
       };
       if (!sessionIdRef.current || sid !== sessionIdRef.current) return;
+      if (seenOutput(output)) return;
 
       switch (output.type) {
         case 'text':
@@ -145,7 +169,20 @@ export function ChatPanel({
       unsubOutput();
       unsubStatus();
     };
-  }, [addMessage, nextMessageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addMessage, nextMessageId, seenOutput]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const prevSessionId = lastSessionIdRef.current;
+    if (prevSessionId === sessionId) return;
+
+    seenOutputRef.current.clear();
+    if (sessionId === null || (prevSessionId && sessionId && prevSessionId !== sessionId)) {
+      setMessages([]);
+      setStreamBuffer('');
+    }
+
+    lastSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Load message history when sessionId changes
   useEffect(() => {

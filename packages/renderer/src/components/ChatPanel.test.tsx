@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders, screen, waitFor, act } from '../__test-utils__/render';
+import { renderWithProviders, screen, waitFor, act, userEvent } from '../__test-utils__/render';
 import { ChatPanel } from './ChatPanel';
 
 describe('ChatPanel', () => {
@@ -76,6 +76,107 @@ describe('ChatPanel', () => {
     );
 
     expect(window.maestro.invoke).not.toHaveBeenCalled();
+  });
+
+  it('keeps first user message when sessionId is created', async () => {
+    const sessionIdRef = { current: null as string | null };
+    const onSend = vi.fn().mockResolvedValue(undefined);
+
+    const { rerender } = renderWithProviders(
+      <ChatPanel sessionId={null} sessionIdRef={sessionIdRef} agentStatus="idle" onSend={onSend} />,
+    );
+
+    const textarea = screen.getByRole('textbox');
+    await userEvent.click(textarea);
+    await userEvent.type(textarea, 'hello first');
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}');
+
+    await waitFor(() => {
+      expect(screen.getByText('hello first')).toBeInTheDocument();
+    });
+
+    sessionIdRef.current = 'session-1';
+    rerender(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={onSend}
+      />,
+    );
+
+    expect(screen.getByText('hello first')).toBeInTheDocument();
+  });
+
+  it('ignores duplicate agent output events', async () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+    const timestamp = new Date().toISOString();
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: { type: 'error', content: 'duplicate event', timestamp },
+      });
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: { type: 'error', content: 'duplicate event', timestamp },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('duplicate event')).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('duplicate event')).toHaveLength(1);
+  });
+
+  it('ignores near-duplicate outputs with different timestamps', async () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'text',
+          content: 'same assistant line',
+          timestamp: new Date('2026-02-23T18:03:46.100Z').toISOString(),
+        },
+      });
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'text',
+          content: 'same assistant line',
+          timestamp: new Date('2026-02-23T18:03:46.900Z').toISOString(),
+        },
+      });
+      fireEvent('agent:status', {
+        sessionId: 'session-1',
+        status: 'waiting',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('same assistant line')).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('same assistant line')).toHaveLength(1);
   });
 
   it('does not emit duplicate React keys when Date.now collides', async () => {
