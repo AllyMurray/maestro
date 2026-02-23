@@ -14,6 +14,7 @@ import {
   Button,
 } from '@mantine/core';
 import { IconFolder, IconGitBranch, IconPlus, IconChevronDown, IconChevronRight } from './Icons';
+import { WorkspaceContextMenu } from './WorkspaceContextMenu';
 import { useAppStore } from '../stores/appStore';
 import type { Workspace, WorkspaceStatus } from '@maestro/shared';
 
@@ -22,6 +23,7 @@ interface SidebarProps {
   onCreateWorkspace: () => void;
   onDeleteProject: (id: string) => void;
   onDeleteWorkspace: (id: string) => void;
+  onChangeStatus: (id: string, status: WorkspaceStatus) => void;
 }
 
 const STATUS_CONFIG: Record<WorkspaceStatus, { label: string; color: string; defaultOpen: boolean }> = {
@@ -47,7 +49,7 @@ function AgentTypeBadge({ type }: { type: string }) {
   );
 }
 
-export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDeleteWorkspace }: SidebarProps) {
+export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDeleteWorkspace, onChangeStatus }: SidebarProps) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
@@ -167,33 +169,38 @@ export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDe
                         </Text>
                       ) : (
                         items.map((ws) => (
-                          <NavLink
+                          <WorkspaceContextMenu
                             key={ws.id}
-                            label={
-                              <Group gap={4}>
-                                <Text size="xs" truncate>
-                                  {ws.name}
-                                </Text>
-                              </Group>
-                            }
-                            description={ws.branchName}
-                            leftSection={<IconGitBranch size={14} />}
-                            active={activeWorkspaceId === ws.id}
-                            onClick={() => setActiveWorkspace(ws.id)}
-                            variant="light"
-                            rightSection={
-                              <Group gap={4}>
-                                <AgentTypeBadge type={ws.agentType} />
-                                {ws.prUrl && (
-                                  <Badge size="xs" variant="light" color="blue">
-                                    PR
-                                  </Badge>
-                                )}
-                              </Group>
-                            }
-                            style={{ borderRadius: 'var(--mantine-radius-sm)' }}
-                            styles={{ label: { fontSize: 12 } }}
-                          />
+                            onDelete={() => onDeleteWorkspace(ws.id)}
+                            onChangeStatus={(status) => onChangeStatus(ws.id, status)}
+                          >
+                            <NavLink
+                              label={
+                                <Group gap={4}>
+                                  <Text size="xs" truncate>
+                                    {ws.name}
+                                  </Text>
+                                </Group>
+                              }
+                              description={ws.branchName}
+                              leftSection={<IconGitBranch size={14} />}
+                              active={activeWorkspaceId === ws.id}
+                              onClick={() => setActiveWorkspace(ws.id)}
+                              variant="light"
+                              rightSection={
+                                <Group gap={4}>
+                                  <AgentTypeBadge type={ws.agentType} />
+                                  {ws.prUrl && (
+                                    <Badge size="xs" variant="light" color="blue">
+                                      PR
+                                    </Badge>
+                                  )}
+                                </Group>
+                              }
+                              style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+                              styles={{ label: { fontSize: 12 } }}
+                            />
+                          </WorkspaceContextMenu>
                         ))
                       )}
                     </Stack>

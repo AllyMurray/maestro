@@ -15,7 +15,7 @@ import { useAppStore } from './stores/appStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ipc } from './services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
-import type { Project, Workspace, AgentType } from '@maestro/shared';
+import type { Project, Workspace, AgentType, WorkspaceStatus } from '@maestro/shared';
 
 export default function App() {
   const [sidebarOpen, { toggle: toggleSidebar }] = useDisclosure(true);
@@ -35,6 +35,7 @@ export default function App() {
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
   const removeProject = useAppStore((s) => s.removeProject);
   const removeWorkspace = useAppStore((s) => s.removeWorkspace);
+  const updateWorkspace = useAppStore((s) => s.updateWorkspace);
   const addProject = useAppStore((s) => s.addProject);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
 
@@ -167,6 +168,22 @@ export default function App() {
     [removeWorkspace],
   );
 
+  const handleChangeWorkspaceStatus = useCallback(
+    async (id: string, status: WorkspaceStatus) => {
+      try {
+        await ipc.invoke(IPC_CHANNELS.WORKSPACE_UPDATE_STATUS, { id, status });
+        updateWorkspace(id, { status });
+      } catch (err) {
+        notifications.show({
+          title: 'Failed to update status',
+          message: String(err),
+          color: 'red',
+        });
+      }
+    },
+    [updateWorkspace],
+  );
+
   useKeyboardShortcuts({
     toggleSidebar,
     toggleRightPanel,
@@ -250,6 +267,7 @@ export default function App() {
                 onCreateWorkspace={openWsCreator}
                 onDeleteProject={handleDeleteProject}
                 onDeleteWorkspace={handleDeleteWorkspace}
+                onChangeStatus={handleChangeWorkspaceStatus}
               />
             }
             center={
