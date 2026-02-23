@@ -12,7 +12,11 @@ vi.mock('../services/agents', () => ({
   getActiveManager: vi.fn(),
   registerManager: vi.fn(),
   unregisterManager: vi.fn(),
-  discoverAgents: vi.fn().mockResolvedValue([]),
+  discoverAgents: vi.fn().mockResolvedValue([
+    { type: 'claude-code', displayName: 'Claude Code', available: true },
+    { type: 'codex', displayName: 'Codex', available: true },
+    { type: 'cursor', displayName: 'Cursor', available: true },
+  ]),
 }));
 
 vi.mock('../services/sessionManager', () => ({
@@ -71,12 +75,15 @@ describe('agentHandlers', () => {
       expect(handler).toBeDefined();
 
       await expect(
-        handler({ sender: {} }, {
-          workspaceId: 'ws-1',
-          workspacePath: '',
-          agentType: 'cursor',
-          opts: {},
-        }),
+        handler(
+          { sender: {} },
+          {
+            workspaceId: 'ws-1',
+            workspacePath: '',
+            agentType: 'cursor',
+            opts: {},
+          },
+        ),
       ).rejects.toThrow('workspacePath is required to start an agent');
     });
 
@@ -84,26 +91,59 @@ describe('agentHandlers', () => {
       const handler = handlers[IPC_CHANNELS.AGENT_START];
 
       await expect(
-        handler({ sender: {} }, {
-          workspaceId: 'ws-1',
-          workspacePath: undefined,
-          agentType: 'cursor',
-          opts: {},
-        }),
+        handler(
+          { sender: {} },
+          {
+            workspaceId: 'ws-1',
+            workspacePath: undefined,
+            agentType: 'cursor',
+            opts: {},
+          },
+        ),
       ).rejects.toThrow('workspacePath is required to start an agent');
     });
 
     it('succeeds when workspacePath is provided', async () => {
       const handler = handlers[IPC_CHANNELS.AGENT_START];
 
-      const result = await handler({ sender: {} }, {
-        workspaceId: 'ws-1',
-        workspacePath: '/valid/path',
-        agentType: 'cursor',
-        opts: {},
-      });
+      const result = await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/valid/path',
+          agentType: 'cursor',
+          opts: {},
+        },
+      );
 
       expect(result).toEqual({ sessionId: 'session-1' });
+    });
+
+    it('throws when selected agent is unavailable', async () => {
+      const { discoverAgents } = await import('../services/agents');
+      (discoverAgents as any).mockResolvedValueOnce([
+        { type: 'claude-code', displayName: 'Claude Code', available: true },
+        {
+          type: 'codex',
+          displayName: 'Codex',
+          available: false,
+          reason: 'Upgrade required (need >= 0.104.0, got 0.90.0)',
+        },
+        { type: 'cursor', displayName: 'Cursor', available: true },
+      ]);
+
+      const handler = handlers[IPC_CHANNELS.AGENT_START];
+      await expect(
+        handler(
+          { sender: {} },
+          {
+            workspaceId: 'ws-1',
+            workspacePath: '/path',
+            agentType: 'codex',
+            opts: {},
+          },
+        ),
+      ).rejects.toThrow('Codex is unavailable: Upgrade required');
     });
   });
 
@@ -114,69 +154,93 @@ describe('agentHandlers', () => {
       const { createAgentManager } = await import('../services/agents');
       const handler = handlers[IPC_CHANNELS.AGENT_START];
 
-      await handler({ sender: {} }, {
-        workspaceId: 'ws-1',
-        workspacePath: '/path',
-        agentType: 'codex',
-        opts: {},
-      });
+      await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/path',
+          agentType: 'codex',
+          opts: {},
+        },
+      );
 
       const mockManager = (createAgentManager as any).mock.results[0].value;
-      expect(mockManager.start).toHaveBeenCalledWith('/path', expect.objectContaining({
-        apiKey: 'sk-openai-stored',
-      }));
+      expect(mockManager.start).toHaveBeenCalledWith(
+        '/path',
+        expect.objectContaining({
+          apiKey: 'sk-openai-stored',
+        }),
+      );
     });
 
     it('resolves anthropic_api_key for claude-code agent', async () => {
       const { createAgentManager } = await import('../services/agents');
       const handler = handlers[IPC_CHANNELS.AGENT_START];
 
-      await handler({ sender: {} }, {
-        workspaceId: 'ws-1',
-        workspacePath: '/path',
-        agentType: 'claude-code',
-        opts: {},
-      });
+      await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/path',
+          agentType: 'claude-code',
+          opts: {},
+        },
+      );
 
       const mockManager = (createAgentManager as any).mock.results[0].value;
-      expect(mockManager.start).toHaveBeenCalledWith('/path', expect.objectContaining({
-        apiKey: 'sk-ant-stored',
-        model: 'claude-sonnet-4-20250514',
-      }));
+      expect(mockManager.start).toHaveBeenCalledWith(
+        '/path',
+        expect.objectContaining({
+          apiKey: 'sk-ant-stored',
+          model: 'claude-sonnet-4-20250514',
+        }),
+      );
     });
 
     it('resolves cursor_api_key for cursor agent', async () => {
       const { createAgentManager } = await import('../services/agents');
       const handler = handlers[IPC_CHANNELS.AGENT_START];
 
-      await handler({ sender: {} }, {
-        workspaceId: 'ws-1',
-        workspacePath: '/path',
-        agentType: 'cursor',
-        opts: {},
-      });
+      await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/path',
+          agentType: 'cursor',
+          opts: {},
+        },
+      );
 
       const mockManager = (createAgentManager as any).mock.results[0].value;
-      expect(mockManager.start).toHaveBeenCalledWith('/path', expect.objectContaining({
-        apiKey: 'sk-cursor-stored',
-      }));
+      expect(mockManager.start).toHaveBeenCalledWith(
+        '/path',
+        expect.objectContaining({
+          apiKey: 'sk-cursor-stored',
+        }),
+      );
     });
 
     it('does not override explicit apiKey from opts', async () => {
       const { createAgentManager } = await import('../services/agents');
       const handler = handlers[IPC_CHANNELS.AGENT_START];
 
-      await handler({ sender: {} }, {
-        workspaceId: 'ws-1',
-        workspacePath: '/path',
-        agentType: 'codex',
-        opts: { apiKey: 'sk-explicit' },
-      });
+      await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/path',
+          agentType: 'codex',
+          opts: { apiKey: 'sk-explicit' },
+        },
+      );
 
       const mockManager = (createAgentManager as any).mock.results[0].value;
-      expect(mockManager.start).toHaveBeenCalledWith('/path', expect.objectContaining({
-        apiKey: 'sk-explicit',
-      }));
+      expect(mockManager.start).toHaveBeenCalledWith(
+        '/path',
+        expect.objectContaining({
+          apiKey: 'sk-explicit',
+        }),
+      );
     });
   });
 });

@@ -9,9 +9,7 @@ export const ITEM_AGENT_MESSAGE = JSON.stringify({
   type: 'item.completed',
   item: {
     type: 'agent_message',
-    content: [
-      { type: 'output_text', text: 'I will fix the bug in index.ts.' },
-    ],
+    text: 'I will fix the bug in index.ts.',
   },
 });
 
@@ -19,9 +17,8 @@ export const ITEM_COMMAND_EXECUTION = JSON.stringify({
   type: 'item.completed',
   item: {
     type: 'command_execution',
-    command: 'cat',
-    args: ['src/index.ts'],
-    output: 'console.log("hello");\n',
+    command: '/bin/zsh -lc cat src/index.ts',
+    aggregated_output: 'console.log("hello");\n',
     exit_code: 0,
   },
 });

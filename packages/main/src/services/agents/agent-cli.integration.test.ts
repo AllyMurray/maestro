@@ -6,11 +6,16 @@ let hasCodex = false;
 let hasCursor = false;
 
 beforeAll(async () => {
-  [hasClaude, hasCodex, hasCursor] = await Promise.all([
+  const [claude, codex, cursorAgent, cursorCliAgent] = await Promise.all([
     hasCommand('claude'),
     hasCommand('codex'),
-    hasCommand('cursor'),
+    hasCommand('cursor-agent'),
+    hasCommand('cursor', ['agent', '--version']),
   ]);
+
+  hasClaude = claude;
+  hasCodex = codex;
+  hasCursor = cursorAgent || cursorCliAgent;
 });
 
 describe('Agent CLI Integration', () => {

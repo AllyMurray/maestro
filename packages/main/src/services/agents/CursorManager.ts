@@ -36,7 +36,7 @@ export class CursorManager extends BaseAgentManager {
         this._command = 'cursor-agent';
         return true;
       } catch {
-        await exec('cursor', ['--version'], { timeout: 5000 });
+        await exec('cursor', ['agent', '--version'], { timeout: 5000 });
         this._command = 'cursor';
         return true;
       }
@@ -53,7 +53,7 @@ export class CursorManager extends BaseAgentManager {
       await exec('cursor-agent', ['--version'], { timeout: 5000 });
       this._command = 'cursor-agent';
     } catch {
-      // Fall back to cursor if cursor-agent is not available
+      await exec('cursor', ['agent', '--version'], { timeout: 5000 });
       this._command = 'cursor';
     }
   }
@@ -76,13 +76,17 @@ export class CursorManager extends BaseAgentManager {
 
     this.setStatus('running');
 
-    const args: string[] = ['--print', '--output-format', 'stream-json', '--trust'];
+    const args: string[] = [];
+    if (this._command === 'cursor') {
+      args.push('agent');
+    }
+    args.push('--print', '--output-format', 'stream-json', '--trust');
     if (this._workspacePath) args.push('--workspace', this._workspacePath);
     if (this._sessionId) args.push('--resume', this._sessionId);
     if (this._opts?.model) args.push('--model', this._opts.model);
     args.push(prompt); // positional, must be last
 
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     if (this._opts?.apiKey) {
       env.CURSOR_API_KEY = this._opts.apiKey;
     }
@@ -217,6 +221,21 @@ export class CursorManager extends BaseAgentManager {
         const result = msg.result as string;
         if (result) {
           this.emitOutput('text', result);
+        }
+        break;
+      }
+
+      case 'tool_call': {
+        const subtype = msg.subtype as string | undefined;
+        const toolCall = msg.tool_call;
+        if (subtype === 'started') {
+          this.emitOutput('tool_call', JSON.stringify(toolCall ?? {}), {
+            toolName: 'tool_call',
+          });
+        } else if (subtype === 'completed') {
+          this.emitOutput('tool_result', JSON.stringify(toolCall ?? {}), {
+            toolName: 'tool_call',
+          });
         }
         break;
       }

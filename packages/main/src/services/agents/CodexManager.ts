@@ -39,12 +39,12 @@ export class CodexManager extends BaseAgentManager {
 
     this.setStatus('running');
 
-    const args: string[] = ['exec', '--json', '-a', 'never'];
+    const args: string[] = ['exec', '--json'];
     if (this._workspacePath) args.push('-C', this._workspacePath);
     if (this._opts.model) args.push('-m', this._opts.model);
     args.push(prompt); // positional, must be last
 
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     if (this._opts.apiKey) {
       env.OPENAI_API_KEY = this._opts.apiKey;
     }
@@ -138,34 +138,42 @@ export class CodexManager extends BaseAgentManager {
         const itemType = item.type as string;
 
         if (itemType === 'agent_message') {
-          const content = item.content as Array<Record<string, unknown>>;
-          if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === 'output_text' && block.text) {
-                this.emitOutput('text', block.text as string);
-              }
-            }
+          const text = item.text as string | undefined;
+          if (text) {
+            this.emitOutput('text', text);
           }
         } else if (itemType === 'command_execution') {
-          this.emitOutput('tool_call', JSON.stringify({
-            command: item.command,
-            args: item.args,
-          }), {
-            toolName: 'command_execution',
-          });
-          if (item.output != null) {
-            this.emitOutput('tool_result', String(item.output), {
+          const command = item.command as string | undefined;
+          const commandArgs = item.args as unknown;
+          this.emitOutput(
+            'tool_call',
+            JSON.stringify({
+              command,
+              args: Array.isArray(commandArgs) ? commandArgs : undefined,
+            }),
+            {
+              toolName: 'command_execution',
+            },
+          );
+
+          const output = item.aggregated_output;
+          if (output != null) {
+            this.emitOutput('tool_result', String(output), {
               toolName: 'command_execution',
               exitCode: item.exit_code,
             });
           }
         } else if (itemType === 'file_change') {
-          this.emitOutput('tool_call', JSON.stringify({
-            file: item.file,
-            action: item.action,
-          }), {
-            toolName: 'file_change',
-          });
+          this.emitOutput(
+            'tool_call',
+            JSON.stringify({
+              file: item.file,
+              action: item.action,
+            }),
+            {
+              toolName: 'file_change',
+            },
+          );
         }
         break;
       }

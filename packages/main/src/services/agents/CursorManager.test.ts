@@ -143,6 +143,25 @@ describe('CursorManager', () => {
       expect(args[args.indexOf('--workspace') + 1]).toBe('/my/workspace');
     });
 
+    it('prepends agent subcommand when falling back to cursor CLI', async () => {
+      mockExecFile.mockImplementation((...args: any[]) => {
+        const cmd = args[0] as string;
+        if (cmd === 'cursor-agent') return Promise.reject(new Error('not found'));
+        return Promise.resolve({ stdout: 'cursor 2.5.20', stderr: '' });
+      });
+
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', {});
+      await manager.send('hello');
+
+      const [cmd, args] = mockSpawn.mock.calls[0];
+      expect(cmd).toBe('cursor');
+      expect(args[0]).toBe('agent');
+      expect(args).toContain('--print');
+    });
+
     it('passes --model when model is set via opts', async () => {
       const mockProc = createMockProcess();
       mockSpawn.mockReturnValue(mockProc);

@@ -7,14 +7,19 @@ import {
   unregisterManager,
   discoverAgents,
 } from '../services/agents';
-import { createSession, updateSessionStatus, setAgentSessionId, addMessage } from '../services/sessionManager';
+import {
+  createSession,
+  updateSessionStatus,
+  setAgentSessionId,
+  addMessage,
+} from '../services/sessionManager';
 import { getConfig } from '../services/configManager';
 import { logger } from '../services/logger';
 
 const API_KEY_CONFIG: Record<AgentType, string> = {
   'claude-code': 'anthropic_api_key',
-  'codex': 'openai_api_key',
-  'cursor': 'cursor_api_key',
+  codex: 'openai_api_key',
+  cursor: 'cursor_api_key',
 };
 
 function resolveOpts(agentType: AgentType, opts: AgentOpts): AgentOpts {
@@ -53,6 +58,15 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
 
       logger.info(`AGENT_START: workspaceId=${data.workspaceId}, agentType=${data.agentType}`);
 
+      const availableAgents = await discoverAgents();
+      const selectedAgent = availableAgents.find((a) => a.type === data.agentType);
+      if (!selectedAgent?.available) {
+        const reason = selectedAgent?.reason || 'Not installed';
+        throw new Error(
+          `${selectedAgent?.displayName || data.agentType} is unavailable: ${reason}`,
+        );
+      }
+
       const opts = resolveOpts(data.agentType, data.opts || {});
       const session = createSession(data.workspaceId, data.agentType, opts.model);
       const manager = createAgentManager(data.agentType);
@@ -69,11 +83,25 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
           sessionId: session.id,
           output,
         });
-        addMessage(session.id, output.type === 'text' ? 'assistant' : output.type, output.content, output.metadata);
+        addMessage(
+          session.id,
+          output.type === 'text' ? 'assistant' : output.type,
+          output.content,
+          output.metadata,
+        );
       });
 
       manager.on('status', (status) => {
-        updateSessionStatus(session.id, status === 'waiting' ? 'waiting' : status === 'running' ? 'running' : status === 'error' ? 'error' : 'running');
+        updateSessionStatus(
+          session.id,
+          status === 'waiting'
+            ? 'waiting'
+            : status === 'running'
+              ? 'running'
+              : status === 'error'
+                ? 'error'
+                : 'running',
+        );
         window?.webContents.send(IPC_CHANNELS.AGENT_STATUS, {
           sessionId: session.id,
           status,

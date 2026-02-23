@@ -10,9 +10,9 @@ const execFileAsync = promisify(execFile);
 /**
  * Detect if a CLI is available on the system.
  */
-export async function hasCommand(cmd: string): Promise<boolean> {
+export async function hasCommand(cmd: string, args: string[] = ['--version']): Promise<boolean> {
   try {
-    await execFileAsync(cmd, ['--version'], { timeout: 5000 });
+    await execFileAsync(cmd, args, { timeout: 5000 });
     return true;
   } catch {
     return false;

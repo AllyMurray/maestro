@@ -25,7 +25,8 @@ describe('AgentRegistry', () => {
         const cmd = args[0] as string;
         if (cmd === 'claude') return Promise.resolve({ stdout: 'claude 1.0.0', stderr: '' });
         if (cmd === 'codex') return Promise.reject(new Error('not found'));
-        if (cmd === 'cursor-agent') return Promise.resolve({ stdout: 'cursor-agent 0.5.0', stderr: '' });
+        if (cmd === 'cursor-agent')
+          return Promise.resolve({ stdout: 'cursor-agent 2.5.20', stderr: '' });
         return Promise.reject(new Error('unknown'));
       });
 
@@ -45,6 +46,26 @@ describe('AgentRegistry', () => {
       expect(cursor!.available).toBe(true);
     });
 
+    it('marks cursor available via cursor CLI fallback', async () => {
+      mockExecFile.mockImplementation((...args: any[]) => {
+        const cmd = args[0] as string;
+        const cmdArgs = (args[1] as string[]) || [];
+        if (cmd === 'claude') return Promise.resolve({ stdout: 'claude 1.0.0', stderr: '' });
+        if (cmd === 'codex') return Promise.resolve({ stdout: 'codex-cli 0.104.0', stderr: '' });
+        if (cmd === 'cursor-agent') return Promise.reject(new Error('not found'));
+        if (cmd === 'cursor' && cmdArgs[0] === 'agent')
+          return Promise.resolve({ stdout: '2.5.20', stderr: '' });
+        return Promise.reject(new Error('unknown'));
+      });
+
+      const { discoverAgents } = await import('./AgentRegistry');
+      const agents = await discoverAgents();
+
+      const cursor = agents.find((a) => a.type === 'cursor');
+      expect(cursor!.available).toBe(true);
+      expect(cursor!.command).toBe('cursor');
+    });
+
     it('handles all agents unavailable', async () => {
       mockExecFile.mockRejectedValue(new Error('not found'));
 
@@ -53,6 +74,24 @@ describe('AgentRegistry', () => {
 
       expect(agents).toHaveLength(3);
       agents.forEach((a) => expect(a.available).toBe(false));
+    });
+
+    it('marks incompatible codex versions as unavailable with reason', async () => {
+      mockExecFile.mockImplementation((...args: any[]) => {
+        const cmd = args[0] as string;
+        if (cmd === 'claude') return Promise.resolve({ stdout: 'claude 2.1.0', stderr: '' });
+        if (cmd === 'codex') return Promise.resolve({ stdout: 'codex-cli 0.90.0', stderr: '' });
+        if (cmd === 'cursor-agent')
+          return Promise.resolve({ stdout: 'cursor-agent 2.5.20', stderr: '' });
+        return Promise.reject(new Error('unknown'));
+      });
+
+      const { discoverAgents } = await import('./AgentRegistry');
+      const agents = await discoverAgents();
+      const codex = agents.find((a) => a.type === 'codex');
+
+      expect(codex!.available).toBe(false);
+      expect(codex!.reason).toContain('Upgrade required');
     });
   });
 

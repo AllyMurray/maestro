@@ -107,15 +107,14 @@ describe('CodexManager', () => {
       expect(args).toContain('--json');
     });
 
-    it('includes -a never for auto-approve off', async () => {
+    it('does not pass deprecated approval flags', async () => {
       const mockProc = createMockProcess();
       mockSpawn.mockReturnValue(mockProc);
 
       await manager.send('hello');
 
       const [, args] = mockSpawn.mock.calls[0];
-      expect(args).toContain('-a');
-      expect(args[args.indexOf('-a') + 1]).toBe('never');
+      expect(args).not.toContain('-a');
     });
 
     it('passes -C with the workspace path', async () => {
@@ -308,8 +307,8 @@ describe('CodexManager', () => {
       expect(outputs[0].type).toBe('tool_call');
       expect(outputs[0].metadata?.toolName).toBe('command_execution');
       const parsed = JSON.parse(outputs[0].content);
-      expect(parsed.command).toBe('cat');
-      expect(parsed.args).toEqual(['src/index.ts']);
+      expect(parsed.command).toBe('/bin/zsh -lc cat src/index.ts');
+      expect(parsed.args).toBeUndefined();
 
       expect(outputs[1].type).toBe('tool_result');
       expect(outputs[1].content).toBe('console.log("hello");\n');
