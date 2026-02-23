@@ -17,7 +17,7 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
         name: string;
         branchName: string;
         targetBranch?: string;
-        agentType?: AgentType;
+        agentType: AgentType;
       },
     ) => {
       const db = getDb();
@@ -34,10 +34,16 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
       const worktreePath = getWorktreePath(repoPath, data.branchName);
       await createWorktree(repoPath, data.branchName, worktreePath);
 
+      if (!data.agentType) {
+        throw new Error('agentType is required');
+      }
+
       db.prepare(
         `INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, target_branch, agent_type, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress')`,
-      ).run(id, data.projectId, data.name, data.branchName, worktreePath, data.targetBranch || 'main', data.agentType || 'claude-code');
+      ).run(id, data.projectId, data.name, data.branchName, worktreePath, data.targetBranch || 'main', data.agentType);
+
+      logger.info(`WORKSPACE_CREATE: id=${id}, agentType=${data.agentType}`);
 
       return mapRow<Workspace>(db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Record<string, unknown>);
     },
