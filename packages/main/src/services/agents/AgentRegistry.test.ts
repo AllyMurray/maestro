@@ -25,7 +25,7 @@ describe('AgentRegistry', () => {
         const cmd = args[0] as string;
         if (cmd === 'claude') return Promise.resolve({ stdout: 'claude 1.0.0', stderr: '' });
         if (cmd === 'codex') return Promise.reject(new Error('not found'));
-        if (cmd === 'cursor') return Promise.resolve({ stdout: 'cursor 0.5.0', stderr: '' });
+        if (cmd === 'cursor-agent') return Promise.resolve({ stdout: 'cursor-agent 0.5.0', stderr: '' });
         return Promise.reject(new Error('unknown'));
       });
 

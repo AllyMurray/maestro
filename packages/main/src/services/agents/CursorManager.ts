@@ -8,12 +8,17 @@ const DEFAULT_WATCHDOG_TIMEOUT = 120_000; // 2 minutes
 export class CursorManager extends BaseAgentManager {
   readonly type: AgentType = 'cursor';
   readonly displayName = 'Cursor';
-  readonly command = 'cursor';
+
+  private _command = 'cursor-agent';
+  get command(): string {
+    return this._command;
+  }
 
   private process: ChildProcess | null = null;
   private buffer = '';
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private watchdogTimeout: number;
+  private _opts: AgentOpts = {};
 
   constructor(watchdogTimeout = DEFAULT_WATCHDOG_TIMEOUT) {
     super();
@@ -25,12 +30,14 @@ export class CursorManager extends BaseAgentManager {
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const exec = promisify(execFile);
-      // Try cursor first, fall back to cursor-agent
+      // Try cursor-agent first, fall back to cursor
       try {
-        await exec(this.command, ['--version'], { timeout: 5000 });
+        await exec('cursor-agent', ['--version'], { timeout: 5000 });
+        this._command = 'cursor-agent';
         return true;
       } catch {
-        await exec('cursor-agent', ['--version'], { timeout: 5000 });
+        await exec('cursor', ['--version'], { timeout: 5000 });
+        this._command = 'cursor';
         return true;
       }
     } catch {
@@ -38,17 +45,28 @@ export class CursorManager extends BaseAgentManager {
     }
   }
 
+  private async resolveCommand(): Promise<void> {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const exec = promisify(execFile);
+    try {
+      await exec('cursor-agent', ['--version'], { timeout: 5000 });
+      this._command = 'cursor-agent';
+    } catch {
+      // Fall back to cursor if cursor-agent is not available
+      this._command = 'cursor';
+    }
+  }
+
   async start(workspacePath: string, opts: AgentOpts): Promise<void> {
     this._workspacePath = workspacePath;
+    this._opts = opts;
     this.setStatus('starting');
 
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
-    if (opts.apiKey) {
-      env.CURSOR_API_KEY = opts.apiKey;
-    }
+    await this.resolveCommand();
 
     this.setStatus('running');
-    logger.info(`Cursor started in ${workspacePath}`);
+    logger.info(`Cursor started in ${workspacePath} (command: ${this._command})`);
   }
 
   async send(prompt: string): Promise<void> {
@@ -58,14 +76,20 @@ export class CursorManager extends BaseAgentManager {
 
     this.setStatus('running');
 
-    const args: string[] = [
-      '-p', prompt,
-      '--output-format', 'stream-json',
-    ];
+    const args: string[] = ['--print', '--output-format', 'stream-json', '--trust'];
+    if (this._workspacePath) args.push('--workspace', this._workspacePath);
+    if (this._sessionId) args.push('--resume', this._sessionId);
+    if (this._opts?.model) args.push('--model', this._opts.model);
+    args.push(prompt); // positional, must be last
 
     const env: Record<string, string> = { ...process.env as Record<string, string> };
+    if (this._opts?.apiKey) {
+      env.CURSOR_API_KEY = this._opts.apiKey;
+    }
 
-    this.process = spawn(this.command, args, {
+    logger.info(`Spawning: ${this._command} ${args.join(' ')}`);
+
+    this.process = spawn(this._command, args, {
       cwd: this._workspacePath!,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],

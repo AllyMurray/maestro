@@ -1,15 +1,56 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CursorManager } from './CursorManager';
 
+const mockExecFile = vi.fn();
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: (...args: any[]) => mockExecFile(...args),
+  };
+});
+vi.mock('util', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('util')>();
+  return {
+    ...actual,
+    promisify: vi.fn(() => mockExecFile),
+  };
+});
+
 vi.mock('../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+
+// Capture spawn calls to verify the command and args
+const mockSpawn = vi.fn();
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    spawn: (...args: any[]) => mockSpawn(...args),
+    execFile: (...args: any[]) => mockExecFile(...args),
+  };
+});
+
+function createMockProcess() {
+  const proc = {
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    stdin: { write: vi.fn(), end: vi.fn() },
+    on: vi.fn(),
+    kill: vi.fn(),
+    pid: 12345,
+  };
+  return proc;
+}
 
 describe('CursorManager', () => {
   let manager: CursorManager;
 
   beforeEach(() => {
     vi.useFakeTimers();
+    mockExecFile.mockReset();
+    mockSpawn.mockReset();
     manager = new CursorManager(5000); // Short watchdog for testing
   });
 
@@ -20,7 +61,7 @@ describe('CursorManager', () => {
   it('has correct type and display name', () => {
     expect(manager.type).toBe('cursor');
     expect(manager.displayName).toBe('Cursor');
-    expect(manager.command).toBe('cursor');
+    expect(manager.command).toBe('cursor-agent');
   });
 
   it('starts with idle status', () => {
@@ -28,12 +69,138 @@ describe('CursorManager', () => {
   });
 
   it('emits status events when status changes', async () => {
+    mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
     const statuses: string[] = [];
     manager.on('status', (s) => statuses.push(s));
 
     await manager.start('/test', {});
     expect(statuses).toContain('starting');
     expect(statuses).toContain('running');
+  });
+
+  // ─── Bug 1 proof: command resolution ───────────────────────────────
+
+  describe('command resolution (Bug 1 fix)', () => {
+    it('defaults to cursor-agent, not cursor', () => {
+      expect(manager.command).toBe('cursor-agent');
+    });
+
+    it('resolveCommand sets cursor-agent when available', async () => {
+      mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
+      await manager.start('/test', {});
+      expect(manager.command).toBe('cursor-agent');
+    });
+
+    it('resolveCommand falls back to cursor when cursor-agent is missing', async () => {
+      mockExecFile.mockImplementation((...args: any[]) => {
+        const cmd = args[0] as string;
+        if (cmd === 'cursor-agent') return Promise.reject(new Error('not found'));
+        return Promise.resolve({ stdout: 'cursor 0.5.0', stderr: '' });
+      });
+      await manager.start('/test', {});
+      expect(manager.command).toBe('cursor');
+    });
+
+    it('stores opts from start() for use in send()', async () => {
+      mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
+      await manager.start('/test', { model: 'gpt-4', apiKey: 'sk-test' });
+      expect((manager as any)._opts).toEqual({ model: 'gpt-4', apiKey: 'sk-test' });
+    });
+  });
+
+  // ─── Bug 1 proof: send() uses correct flags ───────────────────────
+
+  describe('send() args (Bug 1 fix)', () => {
+    beforeEach(async () => {
+      mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
+    });
+
+    it('spawns cursor-agent with --print --output-format stream-json --trust', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', {});
+      await manager.send('hello world');
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+      const [cmd, args, opts] = mockSpawn.mock.calls[0];
+      expect(cmd).toBe('cursor-agent');
+      expect(args).toContain('--print');
+      expect(args).toContain('--trust');
+      expect(args).toContain('--output-format');
+      expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
+    });
+
+    it('passes --workspace with the workspace path', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/my/workspace', {});
+      await manager.send('hello');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).toContain('--workspace');
+      expect(args[args.indexOf('--workspace') + 1]).toBe('/my/workspace');
+    });
+
+    it('passes --model when model is set via opts', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', { model: 'gpt-4o' });
+      await manager.send('hello');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).toContain('--model');
+      expect(args[args.indexOf('--model') + 1]).toBe('gpt-4o');
+    });
+
+    it('passes --resume when sessionId is set', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', {});
+      // Simulate a session_id being set by a previous response
+      (manager as any)._sessionId = 'session-abc';
+      await manager.send('follow up');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).toContain('--resume');
+      expect(args[args.indexOf('--resume') + 1]).toBe('session-abc');
+    });
+
+    it('puts prompt as the last positional argument', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', {});
+      await manager.send('fix the bug');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args[args.length - 1]).toBe('fix the bug');
+    });
+
+    it('does NOT use -p flag (the old broken behavior)', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', {});
+      await manager.send('hello');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).not.toContain('-p');
+    });
+
+    it('sets CURSOR_API_KEY env when apiKey is provided', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', { apiKey: 'sk-secret' });
+      await manager.send('hello');
+
+      const [, , opts] = mockSpawn.mock.calls[0];
+      expect(opts.env.CURSOR_API_KEY).toBe('sk-secret');
+    });
   });
 
   describe('processBuffer', () => {

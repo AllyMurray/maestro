@@ -16,7 +16,7 @@ interface AgentInfo {
 const AGENT_DEFINITIONS: { type: AgentType; displayName: string; command: string; versionFlag: string }[] = [
   { type: 'claude-code', displayName: 'Claude Code', command: 'claude', versionFlag: '--version' },
   { type: 'codex', displayName: 'Codex', command: 'codex', versionFlag: '--version' },
-  { type: 'cursor', displayName: 'Cursor', command: 'cursor', versionFlag: '--version' },
+  { type: 'cursor', displayName: 'Cursor', command: 'cursor-agent', versionFlag: '--version' },
 ];
 
 async function checkCommand(command: string, versionFlag: string): Promise<{ available: boolean; version?: string }> {
