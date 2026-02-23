@@ -1,6 +1,6 @@
 import { IpcMain } from 'electron';
-import { IPC_CHANNELS, Workspace } from '@maestro/shared';
-import type { AgentType } from '@maestro/shared';
+import { IPC_CHANNELS, WORKSPACE_STATUSES, Workspace } from '@maestro/shared';
+import type { AgentType, WorkspaceStatus } from '@maestro/shared';
 import { getDb } from '../database/db';
 import { mapRow, mapRows } from '../database/mapRow';
 import { v4 as uuid } from 'uuid';
@@ -35,8 +35,8 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
       await createWorktree(repoPath, data.branchName, worktreePath);
 
       db.prepare(
-        `INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, target_branch, agent_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, target_branch, agent_type, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress')`,
       ).run(id, data.projectId, data.name, data.branchName, worktreePath, data.targetBranch || 'main', data.agentType || 'claude-code');
 
       return mapRow<Workspace>(db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Record<string, unknown>);
@@ -76,15 +76,17 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     return { success: true };
   });
 
-  ipcMain.handle(IPC_CHANNELS.WORKSPACE_ARCHIVE, (_event, id: string) => {
-    const db = getDb();
-    db.prepare("UPDATE workspaces SET status = 'archived' WHERE id = ?").run(id);
-    return mapRow<Workspace>(db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Record<string, unknown>);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.WORKSPACE_RESTORE, (_event, id: string) => {
-    const db = getDb();
-    db.prepare("UPDATE workspaces SET status = 'active' WHERE id = ?").run(id);
-    return mapRow<Workspace>(db.prepare('SELECT * FROM workspaces WHERE id = ?').get(id) as Record<string, unknown>);
-  });
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_UPDATE_STATUS,
+    (_event, data: { id: string; status: WorkspaceStatus }) => {
+      if (!WORKSPACE_STATUSES.includes(data.status)) {
+        throw new Error(`Invalid workspace status: ${data.status}`);
+      }
+      const db = getDb();
+      db.prepare('UPDATE workspaces SET status = ? WHERE id = ?').run(data.status, data.id);
+      return mapRow<Workspace>(
+        db.prepare('SELECT * FROM workspaces WHERE id = ?').get(data.id) as Record<string, unknown>,
+      );
+    },
+  );
 }

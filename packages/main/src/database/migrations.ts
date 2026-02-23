@@ -109,6 +109,16 @@ const migrations: Migration[] = [
     name: 'add_workspace_agent_type',
     sql: `ALTER TABLE workspaces ADD COLUMN agent_type TEXT DEFAULT 'claude-code';`,
   },
+  {
+    version: 3,
+    name: 'workspace_status_expansion',
+    sql: `
+      UPDATE workspaces SET status = 'in_progress' WHERE status = 'active';
+      UPDATE workspaces SET status = 'cancelled' WHERE status = 'archived';
+    `,
+    // Note: SQLite doesn't support ALTER COLUMN DEFAULT. New workspaces set status
+    // explicitly in the WORKSPACE_CREATE handler, so the old default is harmless.
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

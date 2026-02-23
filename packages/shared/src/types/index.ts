@@ -1,6 +1,6 @@
 export type AgentType = 'claude-code' | 'codex' | 'cursor';
 export type GitPlatform = 'github' | 'gitlab';
-export type WorkspaceStatus = 'active' | 'archived';
+export type WorkspaceStatus = 'backlog' | 'in_progress' | 'in_review' | 'done' | 'cancelled';
 export type MergeStrategy = 'merge' | 'squash' | 'rebase';
 export type MessageRole = 'user' | 'assistant' | 'tool_call' | 'tool_result';
 
@@ -193,6 +193,12 @@ export interface DiffFile {
   status: 'modified' | 'added' | 'deleted' | 'renamed';
   additions: number;
   deletions: number;
+}
+
+export interface FileEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
 }
 
 // IPC type helpers

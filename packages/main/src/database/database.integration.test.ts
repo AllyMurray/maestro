@@ -22,13 +22,13 @@ describe('Database Integration', () => {
     const project = db.prepare("SELECT * FROM projects WHERE id = 'p1'").get() as any;
     expect(project.name).toBe('My App');
 
-    // Create workspace
+    // Create workspace (explicitly set status since column default is legacy 'active')
     db.prepare(
-      "INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path) VALUES ('ws1', 'p1', 'Feature', 'feat/auth', '/worktree')",
+      "INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, status) VALUES ('ws1', 'p1', 'Feature', 'feat/auth', '/worktree', 'in_progress')",
     ).run();
     const workspace = db.prepare("SELECT * FROM workspaces WHERE id = 'ws1'").get() as any;
     expect(workspace.name).toBe('Feature');
-    expect(workspace.status).toBe('active');
+    expect(workspace.status).toBe('in_progress');
 
     // Create session
     db.prepare(
@@ -153,6 +153,6 @@ describe('Database Integration', () => {
     runMigrations(db);
 
     const migrationCount = db.prepare('SELECT COUNT(*) as c FROM _migrations').get() as any;
-    expect(migrationCount.c).toBe(2);
+    expect(migrationCount.c).toBe(3);
   });
 });

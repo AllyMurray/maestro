@@ -8,7 +8,7 @@ export const LOG_DIR_NAME = 'logs';
 
 export const AGENT_TYPES = ['claude-code', 'codex', 'cursor'] as const;
 
-export const WORKSPACE_STATUSES = ['active', 'archived'] as const;
+export const WORKSPACE_STATUSES = ['backlog', 'in_progress', 'in_review', 'done', 'cancelled'] as const;
 
 export const SESSION_STATUSES = [
   'initializing',
@@ -43,8 +43,7 @@ export const IPC_CHANNELS = {
   WORKSPACE_LIST: 'workspace:list',
   WORKSPACE_GET: 'workspace:get',
   WORKSPACE_DELETE: 'workspace:delete',
-  WORKSPACE_ARCHIVE: 'workspace:archive',
-  WORKSPACE_RESTORE: 'workspace:restore',
+  WORKSPACE_UPDATE_STATUS: 'workspace:update-status',
 
   // Sessions
   SESSION_CREATE: 'session:create',
@@ -101,6 +100,9 @@ export const IPC_CHANNELS = {
   DIFF_COMMENT_CREATE: 'diff-comment:create',
   DIFF_COMMENT_LIST: 'diff-comment:list',
   DIFF_COMMENT_RESOLVE: 'diff-comment:resolve',
+
+  // Files
+  FILE_LIST_DIR: 'file:list-dir',
 
   // Dialog
   DIALOG_SELECT_DIRECTORY: 'dialog:select-directory',
