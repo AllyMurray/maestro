@@ -39,6 +39,15 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
   const handleSendPrompt = useCallback(
     async (prompt: string): Promise<void> => {
       try {
+        if (!workspace.worktreePath) {
+          notifications.show({
+            title: 'Workspace not ready',
+            message: 'No worktree path configured.',
+            color: 'red',
+          });
+          return;
+        }
+
         if (!sessionIdRef.current) {
           if (statusUnsubRef.current) {
             statusUnsubRef.current();
@@ -150,6 +159,13 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
           <Text size="sm" fw={600}>
             {workspace.name}
           </Text>
+          <Badge
+            size="xs"
+            variant="light"
+            color={workspace.agentType === 'codex' ? 'green' : workspace.agentType === 'cursor' ? 'violet' : 'blue'}
+          >
+            {workspace.agentType === 'claude-code' ? 'Claude Code' : workspace.agentType === 'codex' ? 'Codex' : 'Cursor'}
+          </Badge>
           <Badge size="xs" variant="outline" color="gray">
             {workspace.branchName}
           </Badge>
@@ -191,6 +207,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
       {/* Chat — always visible */}
       <ChatPanel
         sessionId={sessionId}
+        sessionIdRef={sessionIdRef}
         agentStatus={agentStatus}
         onSend={handleSendPrompt}
         onStop={handleStopAgent}

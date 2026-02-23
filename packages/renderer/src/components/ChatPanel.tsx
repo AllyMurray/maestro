@@ -15,22 +15,17 @@ interface ChatMessage {
 
 interface ChatPanelProps {
   sessionId: string | null;
+  sessionIdRef: React.RefObject<string | null>;
   agentStatus: AgentStatus;
   onSend: (prompt: string) => void | Promise<void>;
   onStop?: () => void;
 }
 
-export function ChatPanel({ sessionId, agentStatus, onSend, onStop }: ChatPanelProps) {
+export function ChatPanel({ sessionId, sessionIdRef, agentStatus, onSend, onStop }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamBuffer, setStreamBuffer] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const sessionIdRef = useRef<string | null>(sessionId);
   const isRunning = agentStatus === 'running';
-
-  // Keep ref in sync with prop
-  useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
