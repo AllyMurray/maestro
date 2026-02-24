@@ -26,7 +26,10 @@ interface SidebarProps {
   onChangeStatus: (id: string, status: WorkspaceStatus) => void;
 }
 
-const STATUS_CONFIG: Record<WorkspaceStatus, { label: string; color: string; defaultOpen: boolean }> = {
+const STATUS_CONFIG: Record<
+  WorkspaceStatus,
+  { label: string; color: string; defaultOpen: boolean }
+> = {
   in_progress: { label: 'In progress', color: 'blue', defaultOpen: true },
   in_review: { label: 'In review', color: 'yellow', defaultOpen: true },
   backlog: { label: 'Backlog', color: 'gray', defaultOpen: true },
@@ -34,22 +37,21 @@ const STATUS_CONFIG: Record<WorkspaceStatus, { label: string; color: string; def
   cancelled: { label: 'Cancelled', color: 'red', defaultOpen: false },
 };
 
-const STATUS_ORDER: WorkspaceStatus[] = ['in_progress', 'in_review', 'backlog', 'done', 'cancelled'];
+const STATUS_ORDER: WorkspaceStatus[] = [
+  'in_progress',
+  'in_review',
+  'backlog',
+  'done',
+  'cancelled',
+];
 
-function AgentTypeBadge({ type }: { type: string }) {
-  const labels: Record<string, string> = {
-    'claude-code': 'CC',
-    codex: 'CX',
-    cursor: 'CR',
-  };
-  return (
-    <Badge size="xs" variant="dot" color="gray">
-      {labels[type] || type}
-    </Badge>
-  );
-}
-
-export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDeleteWorkspace, onChangeStatus }: SidebarProps) {
+export function Sidebar({
+  onAddProject,
+  onCreateWorkspace,
+  onDeleteProject,
+  onDeleteWorkspace,
+  onChangeStatus,
+}: SidebarProps) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
@@ -147,11 +149,7 @@ export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDe
                     style={{ cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => toggleSection(status)}
                   >
-                    {isCollapsed ? (
-                      <IconChevronRight size={10} />
-                    ) : (
-                      <IconChevronDown size={10} />
-                    )}
+                    {isCollapsed ? <IconChevronRight size={10} /> : <IconChevronDown size={10} />}
                     <Text size="xs" fw={600} c="dimmed">
                       {config.label}
                     </Text>
@@ -169,38 +167,36 @@ export function Sidebar({ onAddProject, onCreateWorkspace, onDeleteProject, onDe
                         </Text>
                       ) : (
                         items.map((ws) => (
-                          <WorkspaceContextMenu
+                          <NavLink
                             key={ws.id}
-                            onDelete={() => onDeleteWorkspace(ws.id)}
-                            onChangeStatus={(status) => onChangeStatus(ws.id, status)}
-                          >
-                            <NavLink
-                              label={
-                                <Group gap={4}>
-                                  <Text size="xs" truncate>
-                                    {ws.name}
-                                  </Text>
-                                </Group>
-                              }
-                              description={ws.branchName}
-                              leftSection={<IconGitBranch size={14} />}
-                              active={activeWorkspaceId === ws.id}
-                              onClick={() => setActiveWorkspace(ws.id)}
-                              variant="light"
-                              rightSection={
-                                <Group gap={4}>
-                                  <AgentTypeBadge type={ws.agentType} />
-                                  {ws.prUrl && (
-                                    <Badge size="xs" variant="light" color="blue">
-                                      PR
-                                    </Badge>
-                                  )}
-                                </Group>
-                              }
-                              style={{ borderRadius: 'var(--mantine-radius-sm)' }}
-                              styles={{ label: { fontSize: 12 } }}
-                            />
-                          </WorkspaceContextMenu>
+                            label={
+                              <Group gap={4}>
+                                <Text size="xs" truncate>
+                                  {ws.name}
+                                </Text>
+                              </Group>
+                            }
+                            description={ws.branchName}
+                            leftSection={<IconGitBranch size={14} />}
+                            active={activeWorkspaceId === ws.id}
+                            onClick={() => setActiveWorkspace(ws.id)}
+                            variant="light"
+                            rightSection={
+                              <Group gap={4} wrap="nowrap">
+                                {ws.prUrl && (
+                                  <Badge size="xs" variant="light" color="blue">
+                                    PR
+                                  </Badge>
+                                )}
+                                <WorkspaceContextMenu
+                                  onDelete={() => onDeleteWorkspace(ws.id)}
+                                  onChangeStatus={(status) => onChangeStatus(ws.id, status)}
+                                />
+                              </Group>
+                            }
+                            style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+                            styles={{ label: { fontSize: 12 } }}
+                          />
                         ))
                       )}
                     </Stack>
