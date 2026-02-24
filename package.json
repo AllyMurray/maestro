@@ -18,6 +18,9 @@
     "test": "pnpm -r test",
     "test:unit": "pnpm -r test:unit",
     "test:integration": "pnpm -r test:integration",
+    "pretest:e2e:smoke": "pnpm --filter @maestro/main run postinstall",
+    "test:e2e:smoke": "pnpm exec playwright test e2e/agent-chat.spec.ts e2e/navigation.spec.ts e2e/todo-flow.spec.ts e2e/workspace-flow.spec.ts",
+    "pretest:e2e": "pnpm --filter @maestro/main run postinstall",
     "test:e2e": "pnpm build && playwright test",
     "test:coverage": "pnpm -r test:coverage"
   },

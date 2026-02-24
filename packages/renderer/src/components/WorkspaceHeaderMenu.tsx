@@ -25,7 +25,7 @@ export function WorkspaceHeaderMenu({
   return (
     <Menu shadow="md" width={200} position="bottom-end">
       <Menu.Target>
-        <ActionIcon variant="subtle" color="gray" size="sm">
+        <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Workspace actions">
           <IconDotsVertical size={14} />
         </ActionIcon>
       </Menu.Target>

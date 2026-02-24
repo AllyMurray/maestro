@@ -15,7 +15,19 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['**/*.ts'],
-      exclude: ['**/*.test.ts', '**/*.integration.test.ts', '__test-utils__/**', 'index.ts', 'preload.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.integration.test.ts',
+        '__test-utils__/**',
+        'index.ts',
+        'preload.ts',
+      ],
+      thresholds: {
+        statements: 60,
+        branches: 55,
+        functions: 55,
+        lines: 60,
+      },
     },
   },
   resolve: {
