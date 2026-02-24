@@ -17,6 +17,24 @@ import { ipc } from './services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
 import type { Project, Workspace, AgentType, WorkspaceStatus } from '@maestro/shared';
 
+export function resolveInitialActiveProjectId(
+  projects: Project[],
+  currentActiveProjectId: string | null,
+  savedActiveProjectId: string | null,
+): string | null {
+  if (projects.length === 0) return null;
+
+  if (currentActiveProjectId && projects.some((p) => p.id === currentActiveProjectId)) {
+    return currentActiveProjectId;
+  }
+
+  if (savedActiveProjectId && projects.some((p) => p.id === savedActiveProjectId)) {
+    return savedActiveProjectId;
+  }
+
+  return projects[0].id;
+}
+
 export default function App() {
   const [sidebarOpen, { toggle: toggleSidebar }] = useDisclosure(true);
   const [settingsOpen, { open: openSettings, close: closeSettings }] = useDisclosure(false);
@@ -74,8 +92,48 @@ export default function App() {
 
   // Load projects on startup
   useEffect(() => {
-    ipc.invoke<Project[]>(IPC_CHANNELS.PROJECT_LIST).then(setProjects).catch(() => {});
-  }, [setProjects]);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const loadedProjects = await ipc.invoke<Project[]>(IPC_CHANNELS.PROJECT_LIST);
+        if (cancelled) return;
+
+        setProjects(loadedProjects);
+
+        const savedActiveProjectId = await ipc
+          .invoke<string | null>(IPC_CHANNELS.CONFIG_GET, 'last_active_project_id')
+          .catch(() => null);
+        if (cancelled) return;
+
+        const nextActiveProjectId = resolveInitialActiveProjectId(
+          loadedProjects,
+          activeProjectId,
+          savedActiveProjectId,
+        );
+
+        if (nextActiveProjectId !== activeProjectId) {
+          setActiveProject(nextActiveProjectId);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        notifications.show({
+          title: 'Failed to load repositories',
+          message: String(err),
+          color: 'red',
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProjectId, setActiveProject, setProjects]);
+
+  useEffect(() => {
+    if (!activeProjectId) return;
+    ipc.invoke(IPC_CHANNELS.CONFIG_SET, 'last_active_project_id', activeProjectId).catch(() => {});
+  }, [activeProjectId]);
 
   // Load workspaces when project changes
   useEffect(() => {
