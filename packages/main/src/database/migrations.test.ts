@@ -40,12 +40,16 @@ describe('runMigrations', () => {
     const db = createFreshDb();
     runMigrations(db);
 
-    const migrations = db.prepare('SELECT version, name FROM _migrations ORDER BY version').all() as any[];
-    expect(migrations).toHaveLength(2);
+    const migrations = db
+      .prepare('SELECT version, name FROM _migrations ORDER BY version')
+      .all() as any[];
+    expect(migrations).toHaveLength(3);
     expect(migrations[0].version).toBe(1);
     expect(migrations[0].name).toBe('initial_schema');
     expect(migrations[1].version).toBe(2);
     expect(migrations[1].name).toBe('add_workspace_agent_type');
+    expect(migrations[2].version).toBe(3);
+    expect(migrations[2].name).toBe('workspace_status_expansion');
 
     db.close();
   });
@@ -56,7 +60,7 @@ describe('runMigrations', () => {
     runMigrations(db);
 
     const migrations = db.prepare('SELECT version FROM _migrations').all();
-    expect(migrations).toHaveLength(2);
+    expect(migrations).toHaveLength(3);
 
     db.close();
   });
@@ -102,7 +106,9 @@ describe('runMigrations', () => {
 
     // Verify default value works
     db.prepare("INSERT INTO projects (id, name, path) VALUES ('p1', 'Test', '/test')").run();
-    db.prepare("INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'p1', 'WS', 'main')").run();
+    db.prepare(
+      "INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'p1', 'WS', 'main')",
+    ).run();
     const ws = db.prepare("SELECT agent_type FROM workspaces WHERE id = 'ws1'").get() as any;
     expect(ws.agent_type).toBe('claude-code');
 
@@ -113,9 +119,7 @@ describe('runMigrations', () => {
     const db = createFreshDb();
     runMigrations(db);
 
-    db.prepare(
-      "INSERT INTO projects (id, name, path) VALUES ('p1', 'Test', '/test')",
-    ).run();
+    db.prepare("INSERT INTO projects (id, name, path) VALUES ('p1', 'Test', '/test')").run();
     db.prepare(
       "INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'p1', 'Workspace', 'feat')",
     ).run();
