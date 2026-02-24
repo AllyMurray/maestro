@@ -16,7 +16,13 @@ export async function seedProject(
 
 export async function seedWorkspace(
   page: Page,
-  data: { projectId: string; name: string; branchName: string; targetBranch?: string },
+  data: {
+    projectId: string;
+    name: string;
+    branchName: string;
+    targetBranch?: string;
+    agentType?: 'claude-code' | 'codex' | 'cursor';
+  },
 ): Promise<{ id: string }> {
   const workspace = await page.evaluate(async (data) => {
     return (window as any).maestro.invoke('workspace:create', {
@@ -24,6 +30,7 @@ export async function seedWorkspace(
       name: data.name,
       branchName: data.branchName,
       targetBranch: data.targetBranch || 'main',
+      agentType: data.agentType || 'claude-code',
     });
   }, data);
   return { id: workspace.id };

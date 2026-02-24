@@ -6,41 +6,18 @@ test.describe('Navigation', () => {
   test('sidebar toggle hides and shows sidebar', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Maestro' })).toBeVisible({ timeout: 10000 });
 
-    const navbar = page.locator('.mantine-AppShell-navbar');
+    // Sidebar should be visible initially
+    await expect(page.getByText('Add repository')).toBeVisible();
 
-    // Sidebar should be visible initially — navbar should be on-screen
-    await expect.poll(
-      async () => {
-        const box = await navbar.boundingBox();
-        return box ? box.x >= 0 : false;
-      },
-      { timeout: 5000 },
-    ).toBe(true);
+    const toolbar = page.locator('.titlebar-no-drag').first();
 
-    // Click the toggle sidebar button — it's in the main toolbar, not the sidebar
-    const mainToolbar = page.locator('.mantine-AppShell-main .titlebar-no-drag').first();
-    await mainToolbar.locator('button').first().click();
+    // Hide sidebar
+    await toolbar.locator('button').first().click();
+    await expect(page.getByText('Add repository')).not.toBeVisible();
 
-    // Sidebar should be hidden — navbar should be off-screen (translateX negative)
-    await expect.poll(
-      async () => {
-        const box = await navbar.boundingBox();
-        return box ? box.x + box.width <= 0 : true;
-      },
-      { timeout: 5000 },
-    ).toBe(true);
-
-    // Click again to show
-    await mainToolbar.locator('button').first().click();
-
-    // Navbar should be back on-screen
-    await expect.poll(
-      async () => {
-        const box = await navbar.boundingBox();
-        return box ? box.x >= 0 : false;
-      },
-      { timeout: 5000 },
-    ).toBe(true);
+    // Show sidebar again
+    await toolbar.locator('button').first().click();
+    await expect(page.getByText('Add repository')).toBeVisible();
   });
 
   test('project switching loads correct workspaces', async ({ page, testDataDir }) => {
@@ -57,15 +34,15 @@ test.describe('Navigation', () => {
 
     // Reload so data appears
     await page.reload();
-    await expect(page.getByText('proj-one')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('proj-two')).toBeVisible();
 
-    // Click proj-one — should show WS Alpha
-    await page.getByText('proj-one').click();
+    // Select proj-one — should show WS Alpha
+    await page.getByPlaceholder('Select project').click();
+    await page.getByRole('option', { name: 'proj-one' }).click();
     await expect(page.getByText('WS Alpha')).toBeVisible({ timeout: 5000 });
 
-    // Click proj-two — should show WS Beta
-    await page.getByText('proj-two').click();
+    // Select proj-two — should show WS Beta
+    await page.getByPlaceholder('Select project').click();
+    await page.getByRole('option', { name: 'proj-two' }).click();
     await expect(page.getByText('WS Beta')).toBeVisible({ timeout: 5000 });
   });
 
@@ -81,18 +58,18 @@ test.describe('Navigation', () => {
     });
 
     await page.reload();
-    await page.getByText('nav-test').click();
     await expect(page.getByText('My Workspace')).toBeVisible({ timeout: 5000 });
 
     // Click the workspace in sidebar
     await page.getByText('My Workspace').click();
 
-    // WorkspaceView header should show the branch in the main content area
-    const mainArea = page.locator('.mantine-AppShell-main');
-    await expect(mainArea.getByText('feat/nav')).toBeVisible({ timeout: 5000 });
+    // Workspace header should show the branch name
+    await expect(page.getByTestId('center').getByText('feat/nav').first()).toBeVisible({
+      timeout: 5000,
+    });
 
-    // Tab bar should be visible
-    await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Todos' })).toBeVisible();
+    // Workspace header actions should be visible
+    await expect(page.getByRole('button', { name: 'Open todos' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open checkpoints' })).toBeVisible();
   });
 });

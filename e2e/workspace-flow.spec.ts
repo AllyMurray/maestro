@@ -25,11 +25,12 @@ test.describe('Workspace Flow', () => {
 
     // Click the "New workspace" button in the toolbar — it's the + button next to workspace name in titlebar
     // The toolbar has a + IconPlus button with tooltip "New workspace (Cmd+N)"
-    const toolbar = page.locator('.titlebar-no-drag').last();
-    await toolbar.locator('button').first().click();
+    await page.getByRole('button', { name: 'New workspace' }).first().click();
 
     // The workspace creator modal should open
-    await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Fill in the workspace name
     await page.getByLabel('Workspace name').fill('Add user auth');
@@ -47,7 +48,9 @@ test.describe('Workspace Flow', () => {
 
     // After creation, the workspace name should appear in the toolbar header
     // (the toolbar shows activeWorkspace name)
-    await expect(page.locator('.titlebar-no-drag').getByText('Add user auth')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.titlebar-no-drag').getByText('Add user auth')).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('branch name auto-generation from workspace name', async ({ page, testDataDir }) => {
@@ -62,9 +65,10 @@ test.describe('Workspace Flow', () => {
     await page.waitForTimeout(500);
 
     // Open workspace creator via toolbar + button
-    const toolbar = page.locator('.titlebar-no-drag').last();
-    await toolbar.locator('button').first().click();
-    await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'New workspace' }).first().click();
+    await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Type a workspace name with special characters
     await page.getByLabel('Workspace name').fill('Fix Login Bug #42');
@@ -84,9 +88,10 @@ test.describe('Workspace Flow', () => {
     await page.getByText('header-test').click();
     await page.waitForTimeout(500);
 
-    const toolbar = page.locator('.titlebar-no-drag').last();
-    await toolbar.locator('button').first().click();
-    await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'New workspace' }).first().click();
+    await expect(page.getByRole('heading', { name: 'New Workspace' })).toBeVisible({
+      timeout: 5000,
+    });
 
     await page.getByLabel('Workspace name').fill('My Feature');
     await page.getByRole('textbox', { name: 'AI Agent' }).click();
@@ -94,14 +99,15 @@ test.describe('Workspace Flow', () => {
     await page.getByRole('button', { name: 'Create Workspace' }).click();
 
     // After creation, workspace name should appear in the toolbar
-    await expect(page.locator('.titlebar-no-drag').getByText('My Feature')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.titlebar-no-drag').getByText('My Feature')).toBeVisible({
+      timeout: 10000,
+    });
 
-    // The branch badge should also be visible in WorkspaceView header (scope to main area to avoid sidebar match)
-    const mainArea = page.locator('.mantine-AppShell-main');
-    await expect(mainArea.getByText('my-feature')).toBeVisible();
+    // The branch badge should also be visible in workspace header
+    await expect(page.getByTestId('center').getByText('my-feature').first()).toBeVisible();
 
-    // Chat tab should be visible by default
-    await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Todos' })).toBeVisible();
+    // Workspace header actions should be visible
+    await expect(page.getByRole('button', { name: 'Open todos' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open checkpoints' })).toBeVisible();
   });
 });

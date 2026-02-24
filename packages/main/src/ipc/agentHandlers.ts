@@ -13,6 +13,8 @@ import {
   setAgentSessionId,
   addMessage,
 } from '../services/sessionManager';
+import { createCheckpoint } from '../services/checkpointManager';
+import { getDb } from '../database/db';
 import { getConfig } from '../services/configManager';
 import { logger } from '../services/logger';
 
@@ -139,7 +141,36 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
         throw new Error(`No active agent for session ${data.sessionId}`);
       }
 
-      addMessage(data.sessionId, 'user', data.prompt);
+      const messageId = addMessage(data.sessionId, 'user', data.prompt);
+
+      const db = getDb();
+      const sessionWorkspace = db
+        .prepare(
+          `SELECT s.workspace_id as workspace_id, w.worktree_path as worktree_path
+           FROM sessions s
+           JOIN workspaces w ON w.id = s.workspace_id
+           WHERE s.id = ?`,
+        )
+        .get(data.sessionId) as { workspace_id: string; worktree_path: string | null } | undefined;
+
+      if (!sessionWorkspace) {
+        throw new Error(`Session ${data.sessionId} not found`);
+      }
+      if (!sessionWorkspace.worktree_path) {
+        throw new Error(`Workspace ${sessionWorkspace.workspace_id} has no worktree path`);
+      }
+
+      try {
+        await createCheckpoint(
+          sessionWorkspace.worktree_path,
+          sessionWorkspace.workspace_id,
+          data.sessionId,
+          messageId,
+        );
+      } catch (err) {
+        logger.warn(`Checkpoint creation failed for session ${data.sessionId}: ${String(err)}`);
+      }
+
       await manager.send(data.prompt);
       return { success: true };
     },

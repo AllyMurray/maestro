@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Stack, Group, Text, Badge, ActionIcon, Select } from '@mantine/core';
+import { Stack, Group, Text, Badge, ActionIcon, Select, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { ChatPanel } from './ChatPanel';
@@ -10,7 +10,7 @@ import { CheckpointsDrawer } from './CheckpointsDrawer';
 import { TodosDrawer } from './TodosDrawer';
 import { PRDrawer } from './PRDrawer';
 import { IssueLinker } from './IssueLinker';
-import { IconPlayerStop } from './Icons';
+import { IconPlayerStop, IconArchive, IconGitBranch } from './Icons';
 import { useAppStore } from '../stores/appStore';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS, WORKSPACE_STATUSES } from '@maestro/shared';
@@ -27,11 +27,17 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
-  const [checkpointsOpen, { open: openCheckpoints, close: closeCheckpoints }] = useDisclosure(false);
+  const [checkpointsOpen, { open: openCheckpoints, close: closeCheckpoints }] =
+    useDisclosure(false);
   const [todosOpen, { open: openTodos, close: closeTodos }] = useDisclosure(false);
   const [prOpen, { open: openPR, close: closePR }] = useDisclosure(false);
-  const [issueLinkerOpen, { open: openIssueLinker, close: closeIssueLinker }] = useDisclosure(false);
-  const [statusPickerOpen, { open: openStatusPicker, close: closeStatusPicker }] = useDisclosure(false);
+  const [issueLinkerOpen, { open: openIssueLinker, close: closeIssueLinker }] =
+    useDisclosure(false);
+  const [statusPickerOpen, { open: openStatusPicker, close: closeStatusPicker }] =
+    useDisclosure(false);
+  const [todoCount, setTodoCount] = useState(0);
+  const [todoBlockerCount, setTodoBlockerCount] = useState(0);
+  const [checkpointCount, setCheckpointCount] = useState(0);
 
   const sessionIdRef = useRef<string | null>(null);
   const statusUnsubRef = useRef<(() => void) | null>(null);
@@ -144,6 +150,43 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
     };
   }, []);
 
+  const loadTodoMeta = useCallback(async () => {
+    try {
+      const todos = await ipc.invoke<Array<{ isCompleted: boolean; blocksMerge: boolean }>>(
+        IPC_CHANNELS.TODO_LIST,
+        workspace.id,
+      );
+      const list = Array.isArray(todos) ? todos : [];
+      setTodoCount(list.length);
+      setTodoBlockerCount(list.filter((todo) => todo.blocksMerge && !todo.isCompleted).length);
+    } catch {
+      setTodoCount(0);
+      setTodoBlockerCount(0);
+    }
+  }, [workspace.id]);
+
+  const loadCheckpointMeta = useCallback(async () => {
+    try {
+      const checkpoints = await ipc.invoke<Array<unknown>>(
+        IPC_CHANNELS.CHECKPOINT_LIST,
+        workspace.id,
+      );
+      setCheckpointCount(Array.isArray(checkpoints) ? checkpoints.length : 0);
+    } catch {
+      setCheckpointCount(0);
+    }
+  }, [workspace.id]);
+
+  useEffect(() => {
+    loadTodoMeta();
+    loadCheckpointMeta();
+    const interval = setInterval(() => {
+      loadTodoMeta();
+      loadCheckpointMeta();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [loadTodoMeta, loadCheckpointMeta]);
+
   const isAgentActive = agentStatus === 'running' || agentStatus === 'waiting';
 
   return (
@@ -162,9 +205,19 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
           <Badge
             size="xs"
             variant="light"
-            color={workspace.agentType === 'codex' ? 'green' : workspace.agentType === 'cursor' ? 'violet' : 'blue'}
+            color={
+              workspace.agentType === 'codex'
+                ? 'green'
+                : workspace.agentType === 'cursor'
+                  ? 'violet'
+                  : 'blue'
+            }
           >
-            {workspace.agentType === 'claude-code' ? 'Claude Code' : workspace.agentType === 'codex' ? 'Codex' : 'Cursor'}
+            {workspace.agentType === 'claude-code'
+              ? 'Claude Code'
+              : workspace.agentType === 'codex'
+                ? 'Codex'
+                : 'Cursor'}
           </Badge>
           <Badge size="xs" variant="outline" color="gray">
             {workspace.branchName}
@@ -188,6 +241,32 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
               PR #{workspace.prNumber}
             </Badge>
           )}
+          <Button
+            size="xs"
+            variant="subtle"
+            color="gray"
+            leftSection={<IconArchive size={12} />}
+            onClick={openTodos}
+            aria-label="Open todos"
+          >
+            Todos
+          </Button>
+          <Badge size="xs" variant="light" color={todoBlockerCount > 0 ? 'red' : 'gray'}>
+            {todoCount}
+          </Badge>
+          <Button
+            size="xs"
+            variant="subtle"
+            color="gray"
+            leftSection={<IconGitBranch size={12} />}
+            onClick={openCheckpoints}
+            aria-label="Open checkpoints"
+          >
+            Checkpoints
+          </Button>
+          <Badge size="xs" variant="light" color="gray">
+            {checkpointCount}
+          </Badge>
           <WorkspaceHeaderMenu
             onOpenCheckpoints={openCheckpoints}
             onOpenTodos={openTodos}
@@ -252,11 +331,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         workspaceId={workspace.id}
         workspacePath={workspace.worktreePath}
       />
-      <TodosDrawer
-        opened={todosOpen}
-        onClose={closeTodos}
-        workspaceId={workspace.id}
-      />
+      <TodosDrawer opened={todosOpen} onClose={closeTodos} workspaceId={workspace.id} />
       <PRDrawer
         opened={prOpen}
         onClose={closePR}

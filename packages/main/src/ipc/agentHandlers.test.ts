@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IPC_CHANNELS } from '@maestro/shared';
 
+const mockDbGet = vi.fn();
+
 vi.mock('../services/agents', () => ({
   createAgentManager: vi.fn(() => ({
     on: vi.fn(),
@@ -23,7 +25,19 @@ vi.mock('../services/sessionManager', () => ({
   createSession: vi.fn(() => ({ id: 'session-1' })),
   updateSessionStatus: vi.fn(),
   setAgentSessionId: vi.fn(),
-  addMessage: vi.fn(),
+  addMessage: vi.fn(() => 123),
+}));
+
+vi.mock('../services/checkpointManager', () => ({
+  createCheckpoint: vi.fn().mockResolvedValue({ id: 77, commitHash: 'abc123' }),
+}));
+
+vi.mock('../database/db', () => ({
+  getDb: vi.fn(() => ({
+    prepare: vi.fn(() => ({
+      get: mockDbGet,
+    })),
+  })),
 }));
 
 vi.mock('../services/configManager', () => ({
@@ -56,6 +70,7 @@ describe('agentHandlers', () => {
   beforeEach(async () => {
     handlers = {};
     vi.clearAllMocks();
+    mockDbGet.mockReturnValue({ workspace_id: 'ws-1', worktree_path: '/path' });
 
     const mockIpcMain = {
       handle: vi.fn((channel: string, handler: any) => {
@@ -241,6 +256,52 @@ describe('agentHandlers', () => {
           apiKey: 'sk-explicit',
         }),
       );
+    });
+  });
+
+  describe('AGENT_SEND checkpoints', () => {
+    it('creates a checkpoint before sending prompt', async () => {
+      const { getActiveManager } = await import('../services/agents');
+      const { addMessage } = await import('../services/sessionManager');
+      const { createCheckpoint } = await import('../services/checkpointManager');
+
+      const send = vi.fn().mockResolvedValue(undefined);
+      (getActiveManager as any).mockReturnValue({ send, status: 'running' });
+      (addMessage as any).mockReturnValue(456);
+
+      const handler = handlers[IPC_CHANNELS.AGENT_SEND];
+      const result = await handler(null, { sessionId: 'session-1', prompt: 'Ship it' });
+
+      expect(createCheckpoint).toHaveBeenCalledWith('/path', 'ws-1', 'session-1', 456);
+      expect(send).toHaveBeenCalledWith('Ship it');
+      expect(result).toEqual({ success: true });
+    });
+
+    it('throws when workspace has no worktree path', async () => {
+      const { getActiveManager } = await import('../services/agents');
+
+      (getActiveManager as any).mockReturnValue({ send: vi.fn(), status: 'running' });
+      mockDbGet.mockReturnValueOnce({ workspace_id: 'ws-1', worktree_path: null });
+
+      const handler = handlers[IPC_CHANNELS.AGENT_SEND];
+      await expect(handler(null, { sessionId: 'session-1', prompt: 'hello' })).rejects.toThrow(
+        'Workspace ws-1 has no worktree path',
+      );
+    });
+
+    it('continues sending when checkpoint creation fails', async () => {
+      const { getActiveManager } = await import('../services/agents');
+      const { createCheckpoint } = await import('../services/checkpointManager');
+
+      const send = vi.fn().mockResolvedValue(undefined);
+      (getActiveManager as any).mockReturnValue({ send, status: 'running' });
+      (createCheckpoint as any).mockRejectedValueOnce(new Error('git failed'));
+
+      const handler = handlers[IPC_CHANNELS.AGENT_SEND];
+      const result = await handler(null, { sessionId: 'session-1', prompt: 'go' });
+
+      expect(send).toHaveBeenCalledWith('go');
+      expect(result).toEqual({ success: true });
     });
   });
 });

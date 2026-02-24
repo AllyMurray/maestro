@@ -1,4 +1,4 @@
-import { Drawer } from '@mantine/core';
+import { Drawer, Text, Stack } from '@mantine/core';
 import { CheckpointTimeline } from './CheckpointTimeline';
 
 interface CheckpointsDrawerProps {
@@ -8,18 +8,23 @@ interface CheckpointsDrawerProps {
   workspacePath: string | null;
 }
 
-export function CheckpointsDrawer({ opened, onClose, workspaceId, workspacePath }: CheckpointsDrawerProps) {
+export function CheckpointsDrawer({
+  opened,
+  onClose,
+  workspaceId,
+  workspacePath,
+}: CheckpointsDrawerProps) {
   return (
-    <Drawer
-      opened={opened}
-      onClose={onClose}
-      title="Checkpoints"
-      position="right"
-      size="md"
-    >
+    <Drawer opened={opened} onClose={onClose} title="Checkpoints" position="right" size="md">
       {workspacePath ? (
         <CheckpointTimeline workspaceId={workspaceId} workspacePath={workspacePath} />
-      ) : null}
+      ) : (
+        <Stack p="md" align="center">
+          <Text size="sm" c="dimmed" ta="center">
+            Checkpoints are unavailable until the workspace worktree is ready.
+          </Text>
+        </Stack>
+      )}
     </Drawer>
   );
 }

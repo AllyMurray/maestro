@@ -30,8 +30,8 @@ test.describe('Agent Chat', () => {
     await expect(page.getByText('Chat Workspace')).toBeVisible({ timeout: 5000 });
     await page.getByText('Chat Workspace').click();
 
-    // Should be on Chat tab by default
-    await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible();
+    // Chat input should be visible by default
+    await expect(page.getByPlaceholder('Type a message')).toBeVisible();
 
     return { project, workspace };
   }

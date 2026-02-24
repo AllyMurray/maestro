@@ -127,6 +127,7 @@ export function TodoList({ workspaceId }: TodoListProps) {
                 variant="subtle"
                 size="xs"
                 color="red"
+                aria-label={`Delete todo: ${todo.title}`}
                 onClick={() => handleDelete(todo.id)}
               >
                 <IconTrash size={12} />

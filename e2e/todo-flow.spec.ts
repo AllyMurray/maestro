@@ -28,8 +28,8 @@ test.describe('Todo Flow', () => {
     // Click workspace to activate it
     await page.getByText('Todo Workspace').click();
 
-    // Navigate to the Todos tab
-    await page.getByRole('tab', { name: 'Todos' }).click();
+    // Open Todos drawer from workspace header
+    await page.getByRole('button', { name: 'Open todos' }).click();
     await expect(page.getByPlaceholder('Add a todo...')).toBeVisible({ timeout: 5000 });
 
     return { project, workspace };
@@ -54,7 +54,7 @@ test.describe('Todo Flow', () => {
 
     // Delete the todo — find the delete ActionIcon (the one with red color near the todo)
     const todoItem = page.locator('.mantine-Paper-root').filter({ hasText: 'Write unit tests' });
-    await todoItem.locator('button').click();
+    await todoItem.locator('button[data-size="xs"]').click();
 
     // Todo should be gone
     await expect(page.getByText('Write unit tests')).not.toBeVisible({ timeout: 5000 });
@@ -91,11 +91,9 @@ test.describe('Todo Flow', () => {
     await page.getByPlaceholder('Add a todo...').press('Enter');
     await expect(page.getByText('Persistent todo')).toBeVisible({ timeout: 5000 });
 
-    // Switch to Chat tab
-    await page.getByRole('tab', { name: 'Chat' }).click();
-
-    // Switch back to Todos tab
-    await page.getByRole('tab', { name: 'Todos' }).click();
+    // Close and reopen Todos drawer
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Open todos' }).click();
 
     // Todo should still be there
     await expect(page.getByText('Persistent todo')).toBeVisible({ timeout: 5000 });

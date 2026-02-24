@@ -283,7 +283,12 @@ export default function App() {
         >
           <Group gap="xs" className="titlebar-no-drag">
             <Tooltip label="Toggle sidebar (Cmd+B)" position="bottom">
-              <ActionIcon variant="subtle" color="gray" onClick={toggleSidebar}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                onClick={toggleSidebar}
+                aria-label="Toggle sidebar"
+              >
                 <IconLayoutSidebar size={18} />
               </ActionIcon>
             </Tooltip>
@@ -294,20 +299,35 @@ export default function App() {
           <Group gap="xs" className="titlebar-no-drag">
             {activeProjectId && (
               <Tooltip label="New workspace (Cmd+N)" position="bottom">
-                <ActionIcon variant="subtle" color="gray" onClick={openWsCreator}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  onClick={openWsCreator}
+                  aria-label="New workspace"
+                >
                   <IconPlus size={18} />
                 </ActionIcon>
               </Tooltip>
             )}
             {activeWorkspace && (
               <Tooltip label="Toggle right panel (Cmd+J)" position="bottom">
-                <ActionIcon variant="subtle" color="gray" onClick={toggleRightPanel}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  onClick={toggleRightPanel}
+                  aria-label="Toggle right panel"
+                >
                   <IconPanelRight size={18} />
                 </ActionIcon>
               </Tooltip>
             )}
             <Tooltip label="Settings" position="bottom">
-              <ActionIcon variant="subtle" color="gray" onClick={openSettings}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                onClick={openSettings}
+                aria-label="Open settings"
+              >
                 <IconSettings size={18} />
               </ActionIcon>
             </Tooltip>
