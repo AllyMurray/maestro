@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IPC_CHANNELS } from '@maestro/shared';
 
 const mockDbGet = vi.fn();
+const mockWebContentsSend = vi.fn();
+const mockFromWebContents = vi.fn(() => ({ webContents: { send: mockWebContentsSend } }));
 
 vi.mock('../services/agents', () => ({
   createAgentManager: vi.fn(() => ({
@@ -58,9 +60,7 @@ vi.mock('../services/logger', () => ({
 
 vi.mock('electron', () => ({
   BrowserWindow: {
-    fromWebContents: vi.fn(() => ({
-      webContents: { send: vi.fn() },
-    })),
+    fromWebContents: (sender: unknown) => (mockFromWebContents as any)(sender),
   },
 }));
 
@@ -71,6 +71,7 @@ describe('agentHandlers', () => {
     handlers = {};
     vi.clearAllMocks();
     mockDbGet.mockReturnValue({ workspace_id: 'ws-1', worktree_path: '/path' });
+    mockFromWebContents.mockReturnValue({ webContents: { send: mockWebContentsSend } });
 
     const mockIpcMain = {
       handle: vi.fn((channel: string, handler: any) => {
@@ -260,6 +261,16 @@ describe('agentHandlers', () => {
   });
 
   describe('AGENT_SEND checkpoints', () => {
+    it('throws when no active manager exists', async () => {
+      const { getActiveManager } = await import('../services/agents');
+      (getActiveManager as any).mockReturnValue(undefined);
+
+      const handler = handlers[IPC_CHANNELS.AGENT_SEND];
+      await expect(handler(null, { sessionId: 'missing', prompt: 'hello' })).rejects.toThrow(
+        'No active agent for session missing',
+      );
+    });
+
     it('creates a checkpoint before sending prompt', async () => {
       const { getActiveManager } = await import('../services/agents');
       const { addMessage } = await import('../services/sessionManager');
@@ -289,6 +300,17 @@ describe('agentHandlers', () => {
       );
     });
 
+    it('throws when session cannot be resolved from database', async () => {
+      const { getActiveManager } = await import('../services/agents');
+      (getActiveManager as any).mockReturnValue({ send: vi.fn(), status: 'running' });
+      mockDbGet.mockReturnValueOnce(undefined);
+
+      const handler = handlers[IPC_CHANNELS.AGENT_SEND];
+      await expect(handler(null, { sessionId: 'ghost', prompt: 'hi' })).rejects.toThrow(
+        'Session ghost not found',
+      );
+    });
+
     it('continues sending when checkpoint creation fails', async () => {
       const { getActiveManager } = await import('../services/agents');
       const { createCheckpoint } = await import('../services/checkpointManager');
@@ -301,6 +323,91 @@ describe('agentHandlers', () => {
       const result = await handler(null, { sessionId: 'session-1', prompt: 'go' });
 
       expect(send).toHaveBeenCalledWith('go');
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('AGENT_START event wiring', () => {
+    it('relays output events to renderer and session storage', async () => {
+      const { createAgentManager } = await import('../services/agents');
+      const { addMessage } = await import('../services/sessionManager');
+
+      const handler = handlers[IPC_CHANNELS.AGENT_START];
+      await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/path',
+          agentType: 'claude-code',
+          opts: {},
+        },
+      );
+
+      const manager = (createAgentManager as any).mock.results[0].value;
+      const outputCb = manager.on.mock.calls.find((c: any[]) => c[0] === 'output')?.[1];
+      expect(outputCb).toBeDefined();
+
+      outputCb({
+        type: 'text',
+        content: 'hello from agent',
+        timestamp: new Date().toISOString(),
+      });
+
+      expect(mockWebContentsSend).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_OUTPUT, {
+        sessionId: 'session-1',
+        output: expect.objectContaining({ type: 'text', content: 'hello from agent' }),
+      });
+      expect(addMessage).toHaveBeenCalledWith(
+        'session-1',
+        'assistant',
+        'hello from agent',
+        undefined,
+      );
+    });
+
+    it('logs when BrowserWindow lookup fails but still starts manager', async () => {
+      const { logger } = await import('../services/logger');
+      (mockFromWebContents as any).mockReturnValueOnce(null);
+
+      const handler = handlers[IPC_CHANNELS.AGENT_START];
+      const result = await handler(
+        { sender: {} },
+        {
+          workspaceId: 'ws-1',
+          workspacePath: '/path',
+          agentType: 'claude-code',
+          opts: {},
+        },
+      );
+
+      expect(result).toEqual({ sessionId: 'session-1' });
+      expect((logger as any).error).toHaveBeenCalledWith(
+        'AGENT_START: BrowserWindow.fromWebContents returned null',
+      );
+    });
+  });
+
+  describe('AGENT_STOP and AGENT_STATUS', () => {
+    it('returns idle when no manager status exists', async () => {
+      const { getActiveManager } = await import('../services/agents');
+      (getActiveManager as any).mockReturnValue(undefined);
+
+      const handler = handlers[IPC_CHANNELS.AGENT_STATUS];
+      expect(handler(null, 'session-1')).toBe('idle');
+    });
+
+    it('stops and unregisters active manager', async () => {
+      const { getActiveManager, unregisterManager } = await import('../services/agents');
+      const { updateSessionStatus } = await import('../services/sessionManager');
+      const stop = vi.fn().mockResolvedValue(undefined);
+      (getActiveManager as any).mockReturnValue({ stop });
+
+      const handler = handlers[IPC_CHANNELS.AGENT_STOP];
+      const result = await handler(null, 'session-1');
+
+      expect(stop).toHaveBeenCalled();
+      expect(unregisterManager).toHaveBeenCalledWith('session-1');
+      expect(updateSessionStatus).toHaveBeenCalledWith('session-1', 'completed');
       expect(result).toEqual({ success: true });
     });
   });

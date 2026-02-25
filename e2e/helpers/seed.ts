@@ -2,13 +2,14 @@ import type { Page } from '@playwright/test';
 
 export async function seedProject(
   page: Page,
-  data: { name: string; path: string; defaultBranch?: string },
+  data: { name: string; path: string; defaultBranch?: string; gitPlatform?: 'github' | 'gitlab' },
 ): Promise<{ id: string }> {
   const project = await page.evaluate(async (data) => {
     return (window as any).maestro.invoke('project:create', {
       name: data.name,
       path: data.path,
       defaultBranch: data.defaultBranch || 'main',
+      gitPlatform: data.gitPlatform,
     });
   }, data);
   return { id: project.id };
