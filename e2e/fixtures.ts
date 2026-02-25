@@ -27,7 +27,16 @@ export const test = base.extend<Fixtures>({
       },
     });
     await use(app);
-    await app.close();
+    try {
+      await Promise.race([
+        app.close(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Electron close timeout')), 10000),
+        ),
+      ]);
+    } catch {
+      app.process()?.kill('SIGKILL');
+    }
   },
 
   page: async ({ electronApp }, use) => {

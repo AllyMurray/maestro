@@ -18,9 +18,10 @@
     "test": "pnpm -r test",
     "test:unit": "pnpm -r test:unit",
     "test:integration": "pnpm -r test:integration",
-    "pretest:e2e:smoke": "pnpm --filter @maestro/main run postinstall",
+    "rebuild:native:electron": "pnpm --filter @maestro/main exec electron-rebuild -f -w better-sqlite3,node-pty",
+    "pretest:e2e:smoke": "pnpm rebuild:native:electron",
     "test:e2e:smoke": "pnpm exec playwright test e2e/agent-chat.spec.ts e2e/navigation.spec.ts e2e/todo-flow.spec.ts e2e/workspace-flow.spec.ts",
-    "pretest:e2e": "pnpm --filter @maestro/main run postinstall",
+    "pretest:e2e": "pnpm rebuild:native:electron",
     "test:e2e": "pnpm build && playwright test",
     "test:coverage": "pnpm -r test:coverage"
   },
