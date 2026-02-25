@@ -3,9 +3,29 @@ import path from 'path';
 import fs from 'fs';
 import { logger } from './logger';
 
-// node-pty must be required at runtime (native module)
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pty = require('node-pty');
+type PtySpawnFn = (
+  file: string,
+  args: string[],
+  opts: {
+    name: string;
+    cols: number;
+    rows: number;
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+  },
+) => IPty;
+
+let ptySpawnOverride: PtySpawnFn | null = null;
+
+function getPtySpawn(): PtySpawnFn {
+  if (ptySpawnOverride) {
+    return ptySpawnOverride;
+  }
+  // node-pty must be required at runtime (native module)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const runtimePty = require('node-pty');
+  return runtimePty.spawn;
+}
 
 let spawnHelperFixed = false;
 
@@ -14,7 +34,9 @@ function ensureSpawnHelper(): void {
   try {
     const ptyDir = path.dirname(path.dirname(require.resolve('node-pty')));
     const prebuildsDir = path.join(ptyDir, 'prebuilds');
-    logger.info(`ensureSpawnHelper: ptyDir=${ptyDir}, prebuildsExists=${fs.existsSync(prebuildsDir)}`);
+    logger.info(
+      `ensureSpawnHelper: ptyDir=${ptyDir}, prebuildsExists=${fs.existsSync(prebuildsDir)}`,
+    );
     if (fs.existsSync(prebuildsDir)) {
       const platforms = fs.readdirSync(prebuildsDir);
       for (const platform of platforms) {
@@ -52,6 +74,21 @@ const terminals = new Map<string, TerminalSession>();
 
 let idCounter = 0;
 
+export function resetTerminalSessionStateForTests(): void {
+  terminals.clear();
+  idCounter = 0;
+  spawnHelperFixed = false;
+  ptySpawnOverride = null;
+}
+
+export function setSpawnHelperFixedForTests(value: boolean): void {
+  spawnHelperFixed = value;
+}
+
+export function setPtySpawnOverrideForTests(override: PtySpawnFn | null): void {
+  ptySpawnOverride = override;
+}
+
 export function createTerminal(
   workspacePath: string,
   cols = 80,
@@ -64,7 +101,7 @@ export function createTerminal(
   const id = `term-${++idCounter}`;
   const shell = process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/zsh');
 
-  const ptyProcess: IPty = pty.spawn(shell, [], {
+  const ptyProcess: IPty = getPtySpawn()(shell, [], {
     name: 'xterm-256color',
     cols,
     rows,

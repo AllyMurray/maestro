@@ -6,7 +6,9 @@ import { CursorManager } from './CursorManager';
 
 const activeManagers = new Map<string, BaseAgentManager>();
 
-export function createAgentManager(type: AgentType): BaseAgentManager {
+let createAgentManagerOverride: ((type: AgentType) => BaseAgentManager) | null = null;
+
+function createDefaultAgentManager(type: AgentType): BaseAgentManager {
   switch (type) {
     case 'claude-code':
       return new ClaudeCodeManager();
@@ -17,6 +19,19 @@ export function createAgentManager(type: AgentType): BaseAgentManager {
     default:
       throw new Error(`Unknown agent type: ${type}`);
   }
+}
+
+export function createAgentManager(type: AgentType): BaseAgentManager {
+  if (createAgentManagerOverride) {
+    return createAgentManagerOverride(type);
+  }
+  return createDefaultAgentManager(type);
+}
+
+export function setCreateAgentManagerOverrideForTests(
+  override: ((type: AgentType) => BaseAgentManager) | null,
+): void {
+  createAgentManagerOverride = override;
 }
 
 export function getActiveManager(sessionId: string): BaseAgentManager | undefined {

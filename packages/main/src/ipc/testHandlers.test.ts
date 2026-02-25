@@ -33,6 +33,22 @@ describe('testHandlers', () => {
     const { registerTestHandlers } = await import('./testHandlers');
     registerTestHandlers(ipcMain as any);
 
-    await expect(handlers['test:install-mock-agent']()).rejects.toThrow();
+    await expect(handlers['test:install-mock-agent']()).resolves.toEqual({ success: true });
+
+    const { createAgentManager, setCreateAgentManagerOverrideForTests } =
+      await import('../services/agents/AgentManagerFactory');
+    const { discoverAgents, isAgentAvailable, setDiscoverAgentsOverrideForTests } =
+      await import('../services/agents/AgentRegistry');
+
+    const manager = createAgentManager('claude-code') as any;
+    await manager.start();
+    expect(manager.status).toBe('waiting');
+
+    const agents = await discoverAgents();
+    expect(agents.find((a) => a.type === 'claude-code')?.available).toBe(true);
+    expect(await isAgentAvailable('claude-code')).toBe(true);
+
+    setCreateAgentManagerOverrideForTests(null);
+    setDiscoverAgentsOverrideForTests(null);
   });
 });

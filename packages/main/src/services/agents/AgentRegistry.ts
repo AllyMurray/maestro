@@ -14,6 +14,8 @@ interface AgentInfo {
   reason?: string;
 }
 
+let discoverAgentsOverride: (() => Promise<AgentInfo[]>) | null = null;
+
 const MIN_VERSIONS: Record<AgentType, string> = {
   'claude-code': '1.0.0',
   codex: '0.104.0',
@@ -110,6 +112,10 @@ async function checkAgent(def: {
 }
 
 export async function discoverAgents(): Promise<AgentInfo[]> {
+  if (discoverAgentsOverride) {
+    return discoverAgentsOverride();
+  }
+
   const results = await Promise.all(
     AGENT_DEFINITIONS.map(async (def) => {
       const { available, version, command, reason } = await checkAgent(def);
@@ -133,8 +139,19 @@ export async function discoverAgents(): Promise<AgentInfo[]> {
 }
 
 export async function isAgentAvailable(type: AgentType): Promise<boolean> {
+  if (discoverAgentsOverride) {
+    const agents = await discoverAgentsOverride();
+    return agents.find((a) => a.type === type)?.available ?? false;
+  }
+
   const def = AGENT_DEFINITIONS.find((d) => d.type === type);
   if (!def) return false;
   const { available } = await checkAgent(def);
   return available;
+}
+
+export function setDiscoverAgentsOverrideForTests(
+  override: (() => Promise<AgentInfo[]>) | null,
+): void {
+  discoverAgentsOverride = override;
 }
