@@ -11,7 +11,7 @@
     "pretest:unit": "npm rebuild better-sqlite3 --update-binary",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "sh -c 'files=$(rg --files -g \"*.integration.test.ts\" src); [ -n \"$files\" ] && vitest run $files || vitest run --passWithNoTests'",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --exclude '**/*.integration.test.ts'",
     "test:watch": "vitest",
     "postinstall": "chmod +x ./node_modules/.pnpm/node-pty@*/node_modules/node-pty/prebuilds/darwin-*/spawn-helper ./node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null; electron-rebuild -m ."
   },

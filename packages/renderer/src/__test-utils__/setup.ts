@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
 // Mock window.matchMedia (required by Mantine)
 Object.defineProperty(window, 'matchMedia', {
@@ -22,6 +23,12 @@ class MockResizeObserver {
   disconnect = vi.fn();
 }
 global.ResizeObserver = MockResizeObserver as any;
+
+// JSDOM does not implement scrollIntoView
+Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+  value: vi.fn(),
+  writable: true,
+});
 
 // Mock getComputedStyle (required by Mantine)
 const origGetComputedStyle = window.getComputedStyle;

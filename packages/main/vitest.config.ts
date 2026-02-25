@@ -23,10 +23,10 @@ export default defineConfig({
         'preload.ts',
       ],
       thresholds: {
-        statements: 60,
+        statements: 65,
         branches: 55,
         functions: 55,
-        lines: 60,
+        lines: 65,
       },
     },
   },
