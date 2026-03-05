@@ -190,6 +190,18 @@ describe('CursorManager', () => {
       expect(args[args.indexOf('--resume') + 1]).toBe('session-abc');
     });
 
+    it('passes --resume from opts when restoring an existing session', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', { resumeSessionId: 'agent-session-xyz' });
+      await manager.send('follow up');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).toContain('--resume');
+      expect(args[args.indexOf('--resume') + 1]).toBe('agent-session-xyz');
+    });
+
     it('puts prompt as the last positional argument', async () => {
       const mockProc = createMockProcess();
       mockSpawn.mockReturnValue(mockProc);

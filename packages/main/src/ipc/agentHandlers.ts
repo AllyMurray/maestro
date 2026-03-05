@@ -1,4 +1,4 @@
-import { IpcMain, BrowserWindow } from 'electron';
+import { IpcMain, BrowserWindow, WebContents } from 'electron';
 import { IPC_CHANNELS, AgentType, AgentOpts } from '@maestro/shared';
 import {
   createAgentManager,
@@ -38,6 +38,66 @@ function resolveOpts(agentType: AgentType, opts: AgentOpts): AgentOpts {
   return resolved;
 }
 
+function wireManagerEvents(
+  manager: ReturnType<typeof createAgentManager>,
+  sessionId: string,
+  sender: WebContents | undefined,
+): void {
+  const window = sender ? BrowserWindow.fromWebContents(sender) : null;
+  if (!window) {
+    logger.error('Agent event wiring: BrowserWindow.fromWebContents returned null');
+  }
+
+  manager.on('output', (output) => {
+    logger.debug(`Forwarding agent output: type=${output.type}, sessionId=${sessionId}`);
+    window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
+      sessionId,
+      output,
+    });
+    if (output.type !== 'status') {
+      addMessage(
+        sessionId,
+        output.type === 'text' ? 'assistant' : output.type,
+        output.content,
+        output.metadata,
+      );
+    }
+  });
+
+  manager.on('status', (status) => {
+    updateSessionStatus(
+      sessionId,
+      status === 'waiting'
+        ? 'waiting'
+        : status === 'running'
+          ? 'running'
+          : status === 'error'
+            ? 'error'
+            : 'running',
+    );
+    window?.webContents.send(IPC_CHANNELS.AGENT_STATUS, {
+      sessionId,
+      status,
+    });
+  });
+
+  manager.on('error', (err) => {
+    logger.error(`Agent error (${sessionId}):`, err.message);
+    window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
+      sessionId,
+      output: {
+        type: 'error',
+        content: err.message,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  });
+
+  manager.on('session_id', (agentSessionId) => {
+    setAgentSessionId(sessionId, agentSessionId);
+  });
+}
+
 export function registerAgentHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(IPC_CHANNELS.AGENT_LIST_AVAILABLE, async () => {
     return discoverAgents();
@@ -73,60 +133,7 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
       const session = createSession(data.workspaceId, data.agentType, opts.model);
       const manager = createAgentManager(data.agentType);
 
-      // Wire up events
-      const window = BrowserWindow.fromWebContents(event.sender);
-      if (!window) {
-        logger.error('AGENT_START: BrowserWindow.fromWebContents returned null');
-      }
-
-      manager.on('output', (output) => {
-        logger.debug(`Forwarding agent output: type=${output.type}, sessionId=${session.id}`);
-        window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
-          sessionId: session.id,
-          output,
-        });
-        if (output.type !== 'status') {
-          addMessage(
-            session.id,
-            output.type === 'text' ? 'assistant' : output.type,
-            output.content,
-            output.metadata,
-          );
-        }
-      });
-
-      manager.on('status', (status) => {
-        updateSessionStatus(
-          session.id,
-          status === 'waiting'
-            ? 'waiting'
-            : status === 'running'
-              ? 'running'
-              : status === 'error'
-                ? 'error'
-                : 'running',
-        );
-        window?.webContents.send(IPC_CHANNELS.AGENT_STATUS, {
-          sessionId: session.id,
-          status,
-        });
-      });
-
-      manager.on('error', (err) => {
-        logger.error(`Agent error (${session.id}):`, err.message);
-        window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
-          sessionId: session.id,
-          output: {
-            type: 'error',
-            content: err.message,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      });
-
-      manager.on('session_id', (agentSessionId) => {
-        setAgentSessionId(session.id, agentSessionId);
-      });
+      wireManagerEvents(manager, session.id, event.sender);
 
       registerManager(session.id, manager);
       await manager.start(data.workspacePath, opts);
@@ -137,23 +144,29 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(
     IPC_CHANNELS.AGENT_SEND,
-    async (_event, data: { sessionId: string; prompt: string }) => {
-      const manager = getActiveManager(data.sessionId);
-      if (!manager) {
-        throw new Error(`No active agent for session ${data.sessionId}`);
-      }
-
-      const messageId = addMessage(data.sessionId, 'user', data.prompt);
-
+    async (event, data: { sessionId: string; prompt: string }) => {
       const db = getDb();
       const sessionWorkspace = db
         .prepare(
-          `SELECT s.workspace_id as workspace_id, w.worktree_path as worktree_path
+          `SELECT
+             s.workspace_id as workspace_id,
+             s.agent_type as agent_type,
+             s.model as model,
+             s.agent_session_id as agent_session_id,
+             w.worktree_path as worktree_path
            FROM sessions s
            JOIN workspaces w ON w.id = s.workspace_id
            WHERE s.id = ?`,
         )
-        .get(data.sessionId) as { workspace_id: string; worktree_path: string | null } | undefined;
+        .get(data.sessionId) as
+        | {
+            workspace_id: string;
+            agent_type: AgentType;
+            model: string | null;
+            agent_session_id: string | null;
+            worktree_path: string | null;
+          }
+        | undefined;
 
       if (!sessionWorkspace) {
         throw new Error(`Session ${data.sessionId} not found`);
@@ -161,6 +174,21 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
       if (!sessionWorkspace.worktree_path) {
         throw new Error(`Workspace ${sessionWorkspace.workspace_id} has no worktree path`);
       }
+
+      let manager = getActiveManager(data.sessionId);
+      if (!manager) {
+        logger.info(`Rehydrating agent manager for existing session ${data.sessionId}`);
+        const opts = resolveOpts(sessionWorkspace.agent_type, {
+          model: sessionWorkspace.model || undefined,
+          resumeSessionId: sessionWorkspace.agent_session_id || undefined,
+        });
+        manager = createAgentManager(sessionWorkspace.agent_type);
+        wireManagerEvents(manager, data.sessionId, event?.sender);
+        registerManager(data.sessionId, manager);
+        await manager.start(sessionWorkspace.worktree_path, opts);
+      }
+
+      const messageId = addMessage(data.sessionId, 'user', data.prompt);
 
       try {
         await createCheckpoint(

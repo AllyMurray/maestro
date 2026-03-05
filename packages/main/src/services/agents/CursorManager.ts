@@ -87,7 +87,11 @@ export class CursorManager extends BaseAgentManager {
       args.push('--force');
     }
     if (this._workspacePath) args.push('--workspace', this._workspacePath);
-    if (this._sessionId) args.push('--resume', this._sessionId);
+    if (this._sessionId) {
+      args.push('--resume', this._sessionId);
+    } else if (this._opts.resumeSessionId) {
+      args.push('--resume', this._opts.resumeSessionId);
+    }
     if (this._opts?.model) args.push('--model', this._opts.model);
     args.push(prompt); // positional, must be last
 

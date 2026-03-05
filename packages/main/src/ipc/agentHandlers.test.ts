@@ -70,7 +70,13 @@ describe('agentHandlers', () => {
   beforeEach(async () => {
     handlers = {};
     vi.clearAllMocks();
-    mockDbGet.mockReturnValue({ workspace_id: 'ws-1', worktree_path: '/path' });
+    mockDbGet.mockReturnValue({
+      workspace_id: 'ws-1',
+      agent_type: 'claude-code',
+      model: 'claude-sonnet-4-20250514',
+      agent_session_id: 'agent-session-1',
+      worktree_path: '/path',
+    });
     mockFromWebContents.mockReturnValue({ webContents: { send: mockWebContentsSend } });
 
     const mockIpcMain = {
@@ -261,14 +267,30 @@ describe('agentHandlers', () => {
   });
 
   describe('AGENT_SEND checkpoints', () => {
-    it('throws when no active manager exists', async () => {
-      const { getActiveManager } = await import('../services/agents');
+    it('rehydrates manager when session exists but manager is missing', async () => {
+      const { getActiveManager, createAgentManager, registerManager } =
+        await import('../services/agents');
+
+      const send = vi.fn().mockResolvedValue(undefined);
+      const start = vi.fn().mockResolvedValue(undefined);
+      const on = vi.fn();
+      (createAgentManager as any).mockReturnValue({ on, start, send, status: 'idle' });
       (getActiveManager as any).mockReturnValue(undefined);
 
       const handler = handlers[IPC_CHANNELS.AGENT_SEND];
-      await expect(handler(null, { sessionId: 'missing', prompt: 'hello' })).rejects.toThrow(
-        'No active agent for session missing',
+      const result = await handler({ sender: {} }, { sessionId: 'session-1', prompt: 'hello' });
+
+      expect(createAgentManager).toHaveBeenCalledWith('claude-code');
+      expect(start).toHaveBeenCalledWith(
+        '/path',
+        expect.objectContaining({
+          model: 'claude-sonnet-4-20250514',
+          resumeSessionId: 'agent-session-1',
+        }),
       );
+      expect(registerManager).toHaveBeenCalledWith('session-1', expect.any(Object));
+      expect(send).toHaveBeenCalledWith('hello');
+      expect(result).toEqual({ success: true });
     });
 
     it('creates a checkpoint before sending prompt', async () => {
@@ -382,7 +404,7 @@ describe('agentHandlers', () => {
 
       expect(result).toEqual({ sessionId: 'session-1' });
       expect((logger as any).error).toHaveBeenCalledWith(
-        'AGENT_START: BrowserWindow.fromWebContents returned null',
+        'Agent event wiring: BrowserWindow.fromWebContents returned null',
       );
     });
   });
