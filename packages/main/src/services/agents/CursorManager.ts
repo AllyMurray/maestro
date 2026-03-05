@@ -16,10 +16,10 @@ export class CursorManager extends BaseAgentManager {
 
   private process: ChildProcess | null = null;
   private buffer = '';
+  private stderrBuffer = '';
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private watchdogTimeout: number;
   private _opts: AgentOpts = {};
-  private killedByWatchdog = false;
 
   constructor(watchdogTimeout = DEFAULT_WATCHDOG_TIMEOUT) {
     super();
@@ -97,8 +97,6 @@ export class CursorManager extends BaseAgentManager {
 
     logger.info(`Spawning: ${this._command} ${args.join(' ')}`);
 
-    this.killedByWatchdog = false;
-
     this.process = spawn(this._command, args, {
       cwd: this._workspacePath!,
       env,
@@ -106,6 +104,7 @@ export class CursorManager extends BaseAgentManager {
     });
 
     this.buffer = '';
+    this.stderrBuffer = '';
     this.resetWatchdog();
 
     this.process.stdout?.on('data', (data: Buffer) => {
@@ -116,9 +115,11 @@ export class CursorManager extends BaseAgentManager {
 
     this.process.stderr?.on('data', (data: Buffer) => {
       this.resetWatchdog();
-      const text = data.toString().trim();
-      if (text) {
-        logger.debug(`[cursor stderr] ${text}`);
+      const text = data.toString();
+      this.stderrBuffer += text;
+      const trimmed = text.trim();
+      if (trimmed) {
+        logger.debug(`[cursor stderr] ${trimmed}`);
       }
     });
 
@@ -127,12 +128,6 @@ export class CursorManager extends BaseAgentManager {
       if (this.buffer.trim()) {
         this.emitOutput('text', this.buffer.trim());
         this.buffer = '';
-      }
-
-      if (this.killedByWatchdog) {
-        this.killedByWatchdog = false;
-        this.process = null;
-        return;
       }
 
       if (this._status === 'stopped') {
@@ -144,8 +139,10 @@ export class CursorManager extends BaseAgentManager {
         this.setStatus('waiting');
       } else {
         this.setStatus('error');
-        const message =
-          code === null && signal
+        const stderr = this.stderrBuffer.trim();
+        const message = stderr
+          ? stderr
+          : code === null && signal
             ? `Cursor exited with signal ${signal}`
             : `Cursor exited with code ${code}`;
         this.emit('error', new Error(message));
@@ -165,8 +162,8 @@ export class CursorManager extends BaseAgentManager {
     this.clearWatchdog();
     this.watchdogTimer = setTimeout(() => {
       logger.warn(`Cursor watchdog triggered after ${this.watchdogTimeout}ms of no output`);
-      this.emitOutput('status', 'Watchdog: No output received, restarting...');
-      this.restartProcess();
+      this.emitOutput('status', 'Still waiting for Cursor output...');
+      this.resetWatchdog();
     }, this.watchdogTimeout);
   }
 
@@ -175,16 +172,6 @@ export class CursorManager extends BaseAgentManager {
       clearTimeout(this.watchdogTimer);
       this.watchdogTimer = null;
     }
-  }
-
-  private async restartProcess(): Promise<void> {
-    if (this.process) {
-      this.killedByWatchdog = true;
-      this.process.kill('SIGKILL');
-      this.process = null;
-    }
-    this.setStatus('error');
-    this.emit('error', new Error('Cursor process timed out and was killed'));
   }
 
   private processBuffer(): void {
@@ -259,6 +246,14 @@ export class CursorManager extends BaseAgentManager {
           this.emitOutput('tool_result', JSON.stringify(toolCall ?? {}), {
             toolName: 'tool_call',
           });
+        }
+        break;
+      }
+
+      case 'thinking': {
+        const text = msg.text as string | undefined;
+        if (text) {
+          this.emitOutput('status', text);
         }
         break;
       }

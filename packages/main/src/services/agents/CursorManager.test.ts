@@ -360,6 +360,17 @@ describe('CursorManager', () => {
 
       expect(outputs).toHaveLength(0);
     });
+
+    it('emits status text from thinking deltas', () => {
+      const outputs: any[] = [];
+      manager.on('output', (o) => outputs.push(o));
+
+      (manager as any).handleMessage({ type: 'thinking', subtype: 'delta', text: 'Planning...' });
+
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].type).toBe('status');
+      expect(outputs[0].content).toBe('Planning...');
+    });
   });
 
   describe('watchdog', () => {
@@ -375,10 +386,9 @@ describe('CursorManager', () => {
       // Advance past the timeout
       vi.advanceTimersByTime(6000);
 
-      // Should have emitted a status output and an error
-      expect(outputs.some((o) => o.content.includes('Watchdog'))).toBe(true);
-      expect(errors).toHaveLength(1);
-      expect(errors[0].message).toContain('timed out');
+      // Should emit watchdog status but not error/kill the process
+      expect(outputs.some((o) => o.content.includes('Still waiting for Cursor output'))).toBe(true);
+      expect(errors).toHaveLength(0);
     });
 
     it('does not trigger if cleared before timeout', () => {
@@ -394,7 +404,9 @@ describe('CursorManager', () => {
     });
 
     it('resets on each call to resetWatchdog', () => {
+      const outputs: any[] = [];
       const errors: Error[] = [];
+      manager.on('output', (o) => outputs.push(o));
       manager.on('error', (e) => errors.push(e));
 
       (manager as any).resetWatchdog();
@@ -407,29 +419,8 @@ describe('CursorManager', () => {
       // Now let it expire
       vi.advanceTimersByTime(2000); // 6s since last reset
 
-      expect(errors).toHaveLength(1);
-    });
-
-    it('does not emit duplicate exit error after watchdog kill', async () => {
-      mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
-
-      const mockProc = createMockProcess();
-      mockSpawn.mockReturnValue(mockProc);
-
-      const errors: Error[] = [];
-      manager.on('error', (e) => errors.push(e));
-
-      await manager.start('/workspace', {});
-      await manager.send('hello');
-
-      const closeHandler = mockProc.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
-      expect(closeHandler).toBeTypeOf('function');
-
-      (manager as any).restartProcess();
-      closeHandler?.(null, 'SIGKILL');
-
-      expect(errors).toHaveLength(1);
-      expect(errors[0].message).toContain('timed out');
+      expect(outputs.some((o) => o.content.includes('Still waiting for Cursor output'))).toBe(true);
+      expect(errors).toHaveLength(0);
     });
   });
 

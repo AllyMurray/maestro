@@ -7,7 +7,7 @@ import type { AgentOutput, AgentStatus, Message } from '@maestro/shared';
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'error';
+  role: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'error' | 'status';
   content: string;
   metadata?: Record<string, unknown>;
   timestamp: string;
@@ -142,6 +142,14 @@ export function ChatPanel({
             timestamp: output.timestamp,
           });
           break;
+        case 'status':
+          addMessage({
+            id: nextMessageId('status'),
+            role: 'status',
+            content: output.content,
+            timestamp: output.timestamp,
+          });
+          break;
       }
     });
 
@@ -256,6 +264,7 @@ export function ChatPanel({
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   const isError = message.role === 'error';
+  const isStatus = message.role === 'status';
   const isTool = message.role === 'tool_call' || message.role === 'tool_result';
 
   if (isTool) {
@@ -284,7 +293,11 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         maxWidth: '85%',
       }}
     >
-      <Paper p="sm" radius="md" bg={isUser ? 'brand.8' : isError ? 'red.9' : 'dark.6'}>
+      <Paper
+        p="sm"
+        radius="md"
+        bg={isUser ? 'brand.8' : isError ? 'red.9' : isStatus ? 'dark.5' : 'dark.6'}
+      >
         <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {message.content}
         </Text>

@@ -24,6 +24,8 @@
     "test:e2e:smoke": "pnpm exec playwright test e2e/agent-chat.spec.ts e2e/navigation.spec.ts e2e/todo-flow.spec.ts e2e/workspace-flow.spec.ts e2e/error-flows.spec.ts",
     "pretest:e2e": "pnpm rebuild:native:electron",
     "test:e2e": "pnpm build && playwright test",
+    "pretest:e2e:cursor": "pnpm rebuild:native:electron",
+    "test:e2e:cursor": "pnpm build && MAESTRO_RUN_REAL_CURSOR_E2E=1 playwright test e2e/cursor-chat-real.spec.ts",
     "test:coverage": "pnpm -r test:coverage"
   },
   "devDependencies": {

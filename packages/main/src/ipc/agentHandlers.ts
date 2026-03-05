@@ -85,12 +85,14 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
           sessionId: session.id,
           output,
         });
-        addMessage(
-          session.id,
-          output.type === 'text' ? 'assistant' : output.type,
-          output.content,
-          output.metadata,
-        );
+        if (output.type !== 'status') {
+          addMessage(
+            session.id,
+            output.type === 'text' ? 'assistant' : output.type,
+            output.content,
+            output.metadata,
+          );
+        }
       });
 
       manager.on('status', (status) => {
