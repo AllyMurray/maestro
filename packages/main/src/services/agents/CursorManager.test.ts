@@ -471,6 +471,10 @@ describe('CursorManager', () => {
       expect(outputs).toHaveLength(1);
       expect(outputs[0].type).toBe('status');
       expect(outputs[0].content).toBe('Planning...');
+      expect(outputs[0].metadata).toMatchObject({
+        internal: true,
+        statusKind: 'thinking',
+      });
     });
   });
 
@@ -489,6 +493,11 @@ describe('CursorManager', () => {
 
       // Should emit watchdog status but not error/kill the process
       expect(outputs.some((o) => o.content.includes('Still waiting for Cursor output'))).toBe(true);
+      const watchdog = outputs.find((o) => o.content.includes('Still waiting for Cursor output'));
+      expect(watchdog?.metadata).toMatchObject({
+        internal: false,
+        statusKind: 'watchdog',
+      });
       expect(errors).toHaveLength(0);
     });
 

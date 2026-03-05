@@ -111,7 +111,13 @@ export interface AgentOpts {
 export interface AgentOutput {
   type: 'text' | 'tool_call' | 'tool_result' | 'status' | 'error';
   content: string;
-  metadata?: Record<string, unknown>;
+  metadata?: {
+    toolName?: string;
+    toolId?: string;
+    internal?: boolean;
+    statusKind?: 'thinking' | 'watchdog' | 'runtime';
+    [key: string]: unknown;
+  };
   timestamp: string;
 }
 

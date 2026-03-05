@@ -20,12 +20,14 @@ interface ChatSettings {
   model: string;
   thinking: boolean;
   plan: boolean;
+  showInternals: boolean;
 }
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   model: 'default',
   thinking: false,
   plan: false,
+  showInternals: false,
 };
 
 const CLAUDE_MODEL_OPTIONS = [
@@ -53,6 +55,7 @@ function parseChatSettings(settingsJson?: string): ChatSettings {
       model: parsed.chat?.model || 'default',
       thinking: !!parsed.chat?.thinking,
       plan: !!parsed.chat?.plan,
+      showInternals: !!parsed.chat?.showInternals,
     };
   } catch {
     return DEFAULT_CHAT_SETTINGS;
@@ -499,6 +502,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         selectedModel={chatSettings.model}
         thinkingEnabled={chatSettings.thinking}
         planEnabled={chatSettings.plan}
+        showInternals={chatSettings.showInternals}
         onModelChange={(value) => {
           void persistChatSettings({ ...chatSettings, model: value });
         }}
@@ -507,6 +511,9 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         }}
         onPlanChange={(value) => {
           void persistChatSettings({ ...chatSettings, plan: value });
+        }}
+        onShowInternalsChange={(value) => {
+          void persistChatSettings({ ...chatSettings, showInternals: value });
         }}
       />
 

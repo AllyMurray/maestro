@@ -170,7 +170,10 @@ export class CursorManager extends BaseAgentManager {
     this.clearWatchdog();
     this.watchdogTimer = setTimeout(() => {
       logger.warn(`Cursor watchdog triggered after ${this.watchdogTimeout}ms of no output`);
-      this.emitOutput('status', 'Still waiting for Cursor output...');
+      this.emitOutput('status', 'Still waiting for Cursor output...', {
+        internal: false,
+        statusKind: 'watchdog',
+      });
       this.resetWatchdog();
     }, this.watchdogTimeout);
   }
@@ -291,7 +294,10 @@ export class CursorManager extends BaseAgentManager {
       case 'thinking': {
         const text = msg.text as string | undefined;
         if (text) {
-          this.emitOutput('status', text);
+          this.emitOutput('status', text, {
+            internal: true,
+            statusKind: 'thinking',
+          });
         }
         break;
       }

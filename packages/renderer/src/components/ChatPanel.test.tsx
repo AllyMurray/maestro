@@ -262,6 +262,98 @@ describe('ChatPanel', () => {
     expect(screen.queryByText(' world')).not.toBeInTheDocument();
   });
 
+  it('does not render internal thinking status as a chat bubble', () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'status',
+          content: 'The user is asking if...',
+          metadata: { internal: true, statusKind: 'thinking' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    expect(screen.queryByText('The user is asking if...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('runtime-status-indicator')).not.toBeInTheDocument();
+  });
+
+  it('renders watchdog status in the runtime status indicator', async () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'status',
+          content: 'Still waiting for Cursor output...',
+          metadata: { internal: false, statusKind: 'watchdog' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('runtime-status-indicator')).toBeInTheDocument();
+      expect(screen.getByText('Still waiting for Cursor output...')).toBeInTheDocument();
+    });
+  });
+
+  it('shows internal status lines when Show internals is enabled', async () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'status',
+          content: 'The user is asking if...',
+          metadata: { internal: true, statusKind: 'thinking' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    expect(screen.queryByTestId('internal-status-panel')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('Show internals'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('internal-status-panel')).toBeInTheDocument();
+      expect(screen.getByText('[thinking] The user is asking if...')).toBeInTheDocument();
+    });
+  });
+
   it('does not emit duplicate React keys when Date.now collides', async () => {
     const sessionIdRef = { current: 'session-1' as string | null };
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1771869307165);

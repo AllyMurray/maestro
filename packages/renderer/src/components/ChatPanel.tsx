@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Stack, Paper, Text, ScrollArea, Box, Group, Loader, Code } from '@mantine/core';
+import { Stack, Paper, Text, ScrollArea, Box, Group, Loader, Code, Switch } from '@mantine/core';
 import { ChatInput } from './ChatInput';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS } from '@maestro/shared';
@@ -27,6 +27,20 @@ interface ChatPanelProps {
   onModelChange?: (value: string) => void;
   onThinkingChange?: (value: boolean) => void;
   onPlanChange?: (value: boolean) => void;
+  showInternals?: boolean;
+  onShowInternalsChange?: (value: boolean) => void;
+}
+
+interface RuntimeStatus {
+  content: string;
+  timestamp: string;
+}
+
+interface InternalStatus {
+  id: string;
+  content: string;
+  timestamp: string;
+  statusKind: string;
 }
 
 function coalesceAssistantHistory(messages: ChatMessage[]): ChatMessage[] {
@@ -57,14 +71,43 @@ export function ChatPanel({
   onModelChange,
   onThinkingChange,
   onPlanChange,
+  showInternals,
+  onShowInternalsChange,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamBuffer, setStreamBuffer] = useState('');
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus | null>(null);
+  const [localShowInternals, setLocalShowInternals] = useState(false);
+  const [internalStatuses, setInternalStatuses] = useState<InternalStatus[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messageSeqRef = useRef(0);
+  const runtimeStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenOutputRef = useRef<Map<string, number>>(new Map());
   const lastSessionIdRef = useRef<string | null>(sessionId);
   const isRunning = agentStatus === 'running';
+  const internalsVisible = showInternals ?? localShowInternals;
+
+  const handleShowInternalsChange = useCallback(
+    (value: boolean) => {
+      if (onShowInternalsChange) {
+        onShowInternalsChange(value);
+      } else {
+        setLocalShowInternals(value);
+      }
+    },
+    [onShowInternalsChange],
+  );
+
+  const showRuntimeStatus = useCallback((content: string, timestamp: string) => {
+    setRuntimeStatus({ content, timestamp });
+    if (runtimeStatusTimerRef.current) {
+      clearTimeout(runtimeStatusTimerRef.current);
+    }
+    runtimeStatusTimerRef.current = setTimeout(() => {
+      setRuntimeStatus((current) => (current?.content === content ? null : current));
+      runtimeStatusTimerRef.current = null;
+    }, 5000);
+  }, []);
 
   const nextMessageId = useCallback((prefix: ChatMessage['role']) => {
     messageSeqRef.current += 1;
@@ -182,12 +225,22 @@ export function ChatPanel({
           });
           break;
         case 'status':
-          addMessage({
-            id: nextMessageId('status'),
-            role: 'status',
-            content: output.content,
-            timestamp: output.timestamp,
-          });
+          if (output.metadata?.internal === true) {
+            setInternalStatuses((prev) => {
+              const next = [
+                ...prev,
+                {
+                  id: nextMessageId('status'),
+                  content: output.content,
+                  timestamp: output.timestamp,
+                  statusKind: String(output.metadata?.statusKind || 'runtime'),
+                },
+              ];
+              return next.length > 50 ? next.slice(next.length - 50) : next;
+            });
+            break;
+          }
+          showRuntimeStatus(output.content, output.timestamp);
           break;
       }
     });
@@ -213,10 +266,14 @@ export function ChatPanel({
     });
 
     return () => {
+      if (runtimeStatusTimerRef.current) {
+        clearTimeout(runtimeStatusTimerRef.current);
+        runtimeStatusTimerRef.current = null;
+      }
       unsubOutput();
       unsubStatus();
     };
-  }, [addMessage, nextMessageId, seenOutput]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addMessage, nextMessageId, seenOutput, showRuntimeStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const prevSessionId = lastSessionIdRef.current;
@@ -226,6 +283,8 @@ export function ChatPanel({
     if (sessionId === null || (prevSessionId && sessionId && prevSessionId !== sessionId)) {
       setMessages([]);
       setStreamBuffer('');
+      setRuntimeStatus(null);
+      setInternalStatuses([]);
     }
 
     lastSessionIdRef.current = sessionId;
@@ -234,6 +293,8 @@ export function ChatPanel({
   useEffect(() => {
     setMessages([]);
     setStreamBuffer('');
+    setRuntimeStatus(null);
+    setInternalStatuses([]);
     seenOutputRef.current.clear();
   }, [clearHistoryVersion]);
 
@@ -296,6 +357,34 @@ export function ChatPanel({
               <Loader size="xs" />
               <Text size="xs">Thinking...</Text>
             </Group>
+          )}
+          {runtimeStatus && (
+            <Group gap="xs" c="dimmed" data-testid="runtime-status-indicator">
+              <Loader size="xs" />
+              <Text size="xs">{runtimeStatus.content}</Text>
+            </Group>
+          )}
+          <Group justify="flex-end">
+            <Switch
+              size="xs"
+              label="Show internals"
+              checked={internalsVisible}
+              onChange={(event) => handleShowInternalsChange(event.currentTarget.checked)}
+            />
+          </Group>
+          {internalsVisible && internalStatuses.length > 0 && (
+            <Paper p="xs" bg="dark.6" radius="sm" data-testid="internal-status-panel">
+              <Text size="xs" c="dimmed" mb={4}>
+                Internal events
+              </Text>
+              <Stack gap={4}>
+                {internalStatuses.map((status) => (
+                  <Text key={status.id} size="xs" c="gray.3" style={{ whiteSpace: 'pre-wrap' }}>
+                    [{status.statusKind}] {status.content}
+                  </Text>
+                ))}
+              </Stack>
+            </Paper>
           )}
         </Stack>
       </ScrollArea>

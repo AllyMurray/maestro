@@ -18,9 +18,11 @@ vi.mock('./ChatPanel', () => ({
   ChatPanel: ({
     onSend,
     onStop,
+    onShowInternalsChange,
   }: {
     onSend: (text: string) => Promise<void> | void;
     onStop?: () => void;
+    onShowInternalsChange?: (value: boolean) => void;
   }) => (
     <div>
       <button
@@ -35,6 +37,7 @@ vi.mock('./ChatPanel', () => ({
         Mock Send
       </button>
       <button onClick={() => onStop?.()}>Mock Stop</button>
+      <button onClick={() => onShowInternalsChange?.(true)}>Mock Enable Internals</button>
     </div>
   ),
 }));
@@ -295,6 +298,42 @@ describe('CenterPanel', () => {
         workspacePath: '/tmp/worktree',
         agentType: 'codex',
         opts: {},
+      });
+    });
+  });
+
+  it('persists show internals preference in workspace chat settings', async () => {
+    (window.maestro.invoke as any).mockImplementation((channel: string) => {
+      if (channel === IPC_CHANNELS.TODO_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.CHECKPOINT_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.SESSION_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.AGENT_STATUS) return Promise.resolve('idle');
+      if (channel === IPC_CHANNELS.WORKSPACE_UPDATE_SETTINGS)
+        return Promise.resolve({ success: true });
+      return Promise.resolve(null);
+    });
+
+    renderWithProviders(
+      <CenterPanel
+        workspace={workspace as any}
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mock Enable Internals' }));
+
+    await waitFor(() => {
+      const updateCall = (window.maestro.invoke as any).mock.calls.find(
+        (call: unknown[]) => call[0] === IPC_CHANNELS.WORKSPACE_UPDATE_SETTINGS,
+      );
+      expect(updateCall).toBeDefined();
+      const payload = updateCall[1] as { id: string; settingsJson: string };
+      expect(payload.id).toBe('ws1');
+      expect(JSON.parse(payload.settingsJson)).toMatchObject({
+        chat: {
+          showInternals: true,
+        },
       });
     });
   });
