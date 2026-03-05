@@ -1,5 +1,5 @@
 import { IpcMain, BrowserWindow, WebContents } from 'electron';
-import { IPC_CHANNELS, AgentType, AgentOpts } from '@maestro/shared';
+import { IPC_CHANNELS, AgentType, AgentOpts, AgentOutput } from '@maestro/shared';
 import {
   createAgentManager,
   getActiveManager,
@@ -48,23 +48,37 @@ function wireManagerEvents(
     logger.error('Agent event wiring: BrowserWindow.fromWebContents returned null');
   }
 
+  let pendingAssistantText = '';
+  const flushPendingAssistantText = (): void => {
+    if (!pendingAssistantText) return;
+    addMessage(sessionId, 'assistant', pendingAssistantText);
+    pendingAssistantText = '';
+  };
+
+  const persistOutput = (output: AgentOutput): void => {
+    if (output.type === 'status') return;
+    if (output.type === 'text') {
+      pendingAssistantText += output.content;
+      return;
+    }
+
+    flushPendingAssistantText();
+    addMessage(sessionId, output.type, output.content, output.metadata);
+  };
+
   manager.on('output', (output) => {
     logger.debug(`Forwarding agent output: type=${output.type}, sessionId=${sessionId}`);
     window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
       sessionId,
       output,
     });
-    if (output.type !== 'status') {
-      addMessage(
-        sessionId,
-        output.type === 'text' ? 'assistant' : output.type,
-        output.content,
-        output.metadata,
-      );
-    }
+    persistOutput(output);
   });
 
   manager.on('status', (status) => {
+    if (status === 'waiting' || status === 'stopped' || status === 'error') {
+      flushPendingAssistantText();
+    }
     updateSessionStatus(
       sessionId,
       status === 'waiting'
@@ -82,6 +96,7 @@ function wireManagerEvents(
   });
 
   manager.on('error', (err) => {
+    flushPendingAssistantText();
     logger.error(`Agent error (${sessionId}):`, err.message);
     window?.webContents.send(IPC_CHANNELS.AGENT_OUTPUT, {
       sessionId,

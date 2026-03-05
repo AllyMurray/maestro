@@ -23,12 +23,13 @@ test.describe('Agent Chat', () => {
 
     // Reload so seeded data appears
     await page.reload();
-    await expect(page.getByText('chat-test')).toBeVisible({ timeout: 10000 });
+    const leftPanel = page.getByTestId('left');
+    await expect(leftPanel.getByText('chat-test')).toBeVisible({ timeout: 10000 });
 
     // Select project and workspace
-    await page.getByText('chat-test').click();
-    await expect(page.getByText('Chat Workspace')).toBeVisible({ timeout: 5000 });
-    await page.getByText('Chat Workspace').click();
+    await leftPanel.getByText('chat-test').click();
+    await expect(leftPanel.getByText('Chat Workspace')).toBeVisible({ timeout: 5000 });
+    await leftPanel.getByText('Chat Workspace').click();
 
     // Chat input should be visible by default
     await expect(page.getByPlaceholder('Type a message')).toBeVisible();

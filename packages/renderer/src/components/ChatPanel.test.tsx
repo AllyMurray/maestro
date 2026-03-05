@@ -65,6 +65,42 @@ describe('ChatPanel', () => {
     });
   });
 
+  it('coalesces fragmented assistant history into one bubble', async () => {
+    (window.maestro.invoke as any).mockResolvedValue([
+      {
+        id: 1,
+        sessionId: 's1',
+        role: 'assistant',
+        content: 'Streamed ',
+        metadataJson: '{}',
+        createdAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        sessionId: 's1',
+        role: 'assistant',
+        content: 'message',
+        metadataJson: '{}',
+        createdAt: '2024-01-01T00:00:01Z',
+      },
+    ]);
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="s1"
+        sessionIdRef={{ current: 's1' }}
+        agentStatus="idle"
+        onSend={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Streamed message')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Streamed ')).not.toBeInTheDocument();
+    expect(screen.queryByText('message')).not.toBeInTheDocument();
+  });
+
   it('does not load history while agent is actively running', () => {
     renderWithProviders(
       <ChatPanel

@@ -350,7 +350,7 @@ describe('agentHandlers', () => {
   });
 
   describe('AGENT_START event wiring', () => {
-    it('relays output events to renderer and session storage', async () => {
+    it('buffers streamed text and persists one assistant message at turn end', async () => {
       const { createAgentManager } = await import('../services/agents');
       const { addMessage } = await import('../services/sessionManager');
 
@@ -367,24 +367,31 @@ describe('agentHandlers', () => {
 
       const manager = (createAgentManager as any).mock.results[0].value;
       const outputCb = manager.on.mock.calls.find((c: any[]) => c[0] === 'output')?.[1];
+      const statusCb = manager.on.mock.calls.find((c: any[]) => c[0] === 'status')?.[1];
       expect(outputCb).toBeDefined();
+      expect(statusCb).toBeDefined();
 
       outputCb({
         type: 'text',
-        content: 'hello from agent',
+        content: 'hello ',
+        timestamp: new Date().toISOString(),
+      });
+      outputCb({
+        type: 'text',
+        content: 'from agent',
         timestamp: new Date().toISOString(),
       });
 
       expect(mockWebContentsSend).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_OUTPUT, {
         sessionId: 'session-1',
-        output: expect.objectContaining({ type: 'text', content: 'hello from agent' }),
+        output: expect.objectContaining({ type: 'text', content: 'hello ' }),
       });
-      expect(addMessage).toHaveBeenCalledWith(
-        'session-1',
-        'assistant',
-        'hello from agent',
-        undefined,
-      );
+      expect(addMessage).not.toHaveBeenCalled();
+
+      statusCb('waiting');
+
+      expect(addMessage).toHaveBeenCalledTimes(1);
+      expect(addMessage).toHaveBeenCalledWith('session-1', 'assistant', 'hello from agent');
     });
 
     it('logs when BrowserWindow lookup fails but still starts manager', async () => {

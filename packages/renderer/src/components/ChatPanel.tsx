@@ -21,6 +21,20 @@ interface ChatPanelProps {
   onStop?: () => void;
 }
 
+function coalesceAssistantHistory(messages: ChatMessage[]): ChatMessage[] {
+  const coalesced: ChatMessage[] = [];
+  for (const message of messages) {
+    const last = coalesced[coalesced.length - 1];
+    if (last && last.role === 'assistant' && message.role === 'assistant') {
+      last.content += message.content;
+      last.timestamp = message.timestamp;
+      continue;
+    }
+    coalesced.push({ ...message });
+  }
+  return coalesced;
+}
+
 export function ChatPanel({
   sessionId,
   sessionIdRef,
@@ -215,7 +229,7 @@ export function ChatPanel({
             metadata: m.metadataJson ? JSON.parse(m.metadataJson) : undefined,
             timestamp: m.createdAt,
           }));
-          setMessages(restored);
+          setMessages(coalesceAssistantHistory(restored));
         }
       })
       .catch(() => {});
