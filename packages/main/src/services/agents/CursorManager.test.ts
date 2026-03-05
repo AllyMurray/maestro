@@ -371,6 +371,23 @@ describe('CursorManager', () => {
       expect(outputs[0].content).toBe('You are on main.');
     });
 
+    it('suppresses duplicate assistant text when assistant message repeats', () => {
+      const outputs: any[] = [];
+      manager.on('output', (o) => outputs.push(o));
+
+      const assistantMessage = {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: "You're on `monitor-pipeline-stability`." }] },
+      };
+
+      (manager as any).handleMessage(assistantMessage);
+      (manager as any).handleMessage(assistantMessage);
+
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].type).toBe('text');
+      expect(outputs[0].content).toBe("You're on `monitor-pipeline-stability`.");
+    });
+
     it('still emits tool_call from assistant after text_delta', () => {
       const outputs: any[] = [];
       manager.on('output', (o) => outputs.push(o));

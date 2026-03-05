@@ -202,6 +202,24 @@ export class CursorManager extends BaseAgentManager {
     this.emittedTextThisTurn += content;
   }
 
+  private isDuplicateForTurn(content: string): boolean {
+    const normalizedIncoming = this.normalizeWhitespace(content);
+    const normalizedPrior = this.normalizeWhitespace(this.emittedTextThisTurn);
+    if (!normalizedIncoming || !normalizedPrior) return false;
+
+    return (
+      normalizedIncoming === normalizedPrior ||
+      normalizedPrior.endsWith(normalizedIncoming) ||
+      normalizedIncoming.endsWith(normalizedPrior)
+    );
+  }
+
+  private emitTextIfNovel(content: string): void {
+    if (!this.isDuplicateForTurn(content)) {
+      this.emitText(content);
+    }
+  }
+
   private normalizeWhitespace(text: string): string {
     return text.replace(/\s+/g, ' ').trim();
   }
@@ -234,7 +252,7 @@ export class CursorManager extends BaseAgentManager {
             for (const block of blocks) {
               if (block.type === 'text') {
                 if (!this.sawTextDeltaThisTurn) {
-                  this.emitText(block.text as string);
+                  this.emitTextIfNovel(block.text as string);
                 }
               } else if (block.type === 'tool_use') {
                 this.emitOutput('tool_call', JSON.stringify(block), {
@@ -250,16 +268,7 @@ export class CursorManager extends BaseAgentManager {
       case 'result': {
         const result = msg.result as string;
         if (result) {
-          const normalizedResult = this.normalizeWhitespace(result);
-          const normalizedPrior = this.normalizeWhitespace(this.emittedTextThisTurn);
-          const isDuplicate =
-            !!normalizedPrior &&
-            (normalizedResult === normalizedPrior ||
-              normalizedResult.endsWith(normalizedPrior) ||
-              normalizedPrior.endsWith(normalizedResult));
-          if (!isDuplicate) {
-            this.emitText(result);
-          }
+          this.emitTextIfNovel(result);
         }
         break;
       }
