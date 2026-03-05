@@ -39,16 +39,21 @@ export function WorkspaceCreator({
       .invoke<{ type: AgentType; displayName: string; available: boolean; reason?: string }[]>(
         IPC_CHANNELS.AGENT_LIST_AVAILABLE,
       )
-      .then((agents) =>
-        setAvailableAgents(
-          agents.map((a) => ({
-            value: a.type,
-            label: a.displayName,
-            available: a.available,
-            reason: a.reason,
-          })),
-        ),
-      )
+      .then((agents) => {
+        const mappedAgents = agents.map((a) => ({
+          value: a.type,
+          label: a.displayName,
+          available: a.available,
+          reason: a.reason,
+        }));
+
+        setAvailableAgents(mappedAgents);
+
+        const available = mappedAgents.filter((agent) => agent.available);
+        if (available.length === 1) {
+          setAgentType((current) => current ?? available[0].value);
+        }
+      })
       .catch(() => {});
   }, [opened]);
 

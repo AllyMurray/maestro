@@ -64,4 +64,36 @@ describe('WorkspaceCreator', () => {
     const targetInput = screen.getByLabelText(/Target branch/) as HTMLInputElement;
     expect(targetInput.value).toBe('develop');
   });
+
+  it('preselects the only available AI agent', async () => {
+    (window.maestro.invoke as any).mockResolvedValueOnce([
+      { type: 'claude-code', displayName: 'Claude Code', available: true },
+      { type: 'codex', displayName: 'Codex', available: false, reason: 'not installed' },
+      { type: 'cursor', displayName: 'Cursor', available: false, reason: 'not installed' },
+    ]);
+
+    renderWithProviders(<WorkspaceCreator {...defaultProps} />);
+
+    await waitFor(() => {
+      expect((screen.getByRole('textbox', { name: 'AI Agent' }) as HTMLInputElement).value).toBe(
+        'Claude Code',
+      );
+    });
+  });
+
+  it('does not preselect an AI agent when multiple are available', async () => {
+    (window.maestro.invoke as any).mockResolvedValueOnce([
+      { type: 'claude-code', displayName: 'Claude Code', available: true },
+      { type: 'codex', displayName: 'Codex', available: true },
+      { type: 'cursor', displayName: 'Cursor', available: false, reason: 'not installed' },
+    ]);
+
+    renderWithProviders(<WorkspaceCreator {...defaultProps} />);
+
+    await waitFor(() => {
+      expect((screen.getByRole('textbox', { name: 'AI Agent' }) as HTMLInputElement).value).toBe(
+        '',
+      );
+    });
+  });
 });
