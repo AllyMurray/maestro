@@ -324,6 +324,9 @@ export default function App() {
         onToggleRightPanel={toggleRightPanel}
         onOpenSettings={openSettings}
         onCreateWorkspace={openWsCreator}
+        onClearChatHistory={() => {
+          window.dispatchEvent(new CustomEvent('maestro:clear-chat-history'));
+        }}
       />
 
       <Box

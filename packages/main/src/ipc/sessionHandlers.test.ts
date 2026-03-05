@@ -4,11 +4,13 @@ import { IPC_CHANNELS } from '@maestro/shared';
 const getSession = vi.fn();
 const listSessions = vi.fn();
 const getMessages = vi.fn();
+const clearSessionHistory = vi.fn();
 
 vi.mock('../services/sessionManager', () => ({
   getSession: (...args: unknown[]) => getSession(...args),
   listSessions: (...args: unknown[]) => listSessions(...args),
   getMessages: (...args: unknown[]) => getMessages(...args),
+  clearSessionHistory: (...args: unknown[]) => clearSessionHistory(...args),
 }));
 
 describe('sessionHandlers', () => {
@@ -46,5 +48,13 @@ describe('sessionHandlers', () => {
     const result = handlers[IPC_CHANNELS.MESSAGE_LIST](null, 's1', 50, 100);
     expect(getMessages).toHaveBeenCalledWith('s1', 50, 100);
     expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  it('clears session history via handler', () => {
+    clearSessionHistory.mockReturnValue(undefined);
+
+    const result = handlers[IPC_CHANNELS.SESSION_CLEAR](null, 's1');
+    expect(clearSessionHistory).toHaveBeenCalledWith('s1');
+    expect(result).toEqual({ success: true });
   });
 });

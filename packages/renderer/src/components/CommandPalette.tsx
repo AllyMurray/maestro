@@ -7,6 +7,7 @@ import {
   IconSearch,
   IconLayoutSidebar,
   IconPanelRight,
+  IconTrash,
 } from './Icons';
 import { useAppStore } from '../stores/appStore';
 
@@ -15,6 +16,7 @@ interface CommandPaletteProps {
   onToggleRightPanel: () => void;
   onOpenSettings: () => void;
   onCreateWorkspace: () => void;
+  onClearChatHistory: () => void;
 }
 
 export function CommandPalette({
@@ -22,9 +24,11 @@ export function CommandPalette({
   onToggleRightPanel,
   onOpenSettings,
   onCreateWorkspace,
+  onClearChatHistory,
 }: CommandPaletteProps) {
   const projects = useAppStore((s) => s.projects);
   const workspaces = useAppStore((s) => s.workspaces);
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace);
   const setRightPanelTab = useAppStore((s) => s.setRightPanelTab);
@@ -72,6 +76,17 @@ export function CommandPalette({
       leftSection: <IconSettings size={18} />,
       onClick: onOpenSettings,
     },
+    ...(activeWorkspaceId
+      ? [
+          {
+            id: 'clear-chat-history',
+            label: 'Clear Chat History',
+            description: 'Clear chat history for current session',
+            leftSection: <IconTrash size={18} />,
+            onClick: onClearChatHistory,
+          },
+        ]
+      : []),
     // Dynamic project/workspace actions
     ...projects.map((p) => ({
       id: `project-${p.id}`,

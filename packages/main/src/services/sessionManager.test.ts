@@ -19,7 +19,9 @@ describe('sessionManager', () => {
     // Insert a project and workspace for FK constraints
     testDb.prepare("INSERT INTO projects (id, name, path) VALUES ('p1', 'Test', '/test')").run();
     testDb
-      .prepare("INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'p1', 'WS', 'main')")
+      .prepare(
+        "INSERT INTO workspaces (id, project_id, name, branch_name) VALUES ('ws1', 'p1', 'WS', 'main')",
+      )
       .run();
   });
 
@@ -123,5 +125,38 @@ describe('sessionManager', () => {
     const messages = getMessages(session.id) as any[];
     const parsed = JSON.parse(messages[0].metadataJson);
     expect(parsed.toolName).toBe('Read');
+  });
+
+  it('clearSessionHistory deletes messages/checkpoints and resets resume state', async () => {
+    const { createSession, addMessage, clearSessionHistory, setAgentSessionId } =
+      await import('./sessionManager');
+    const session = createSession('ws1', 'claude-code');
+    addMessage(session.id, 'user', 'hello');
+    addMessage(session.id, 'assistant', 'world');
+    setAgentSessionId(session.id, 'agent-session-123');
+
+    testDb
+      .prepare(
+        `INSERT INTO checkpoints (workspace_id, session_id, commit_hash, message_index)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run('ws1', session.id, 'abc123', 1);
+
+    clearSessionHistory(session.id);
+
+    const messageCount = testDb
+      .prepare('SELECT COUNT(*) AS count FROM messages WHERE session_id = ?')
+      .get(session.id) as { count: number };
+    const checkpointCount = testDb
+      .prepare('SELECT COUNT(*) AS count FROM checkpoints WHERE session_id = ?')
+      .get(session.id) as { count: number };
+    const persistedSession = testDb
+      .prepare('SELECT id, agent_session_id FROM sessions WHERE id = ?')
+      .get(session.id) as { id: string; agent_session_id: string | null } | undefined;
+
+    expect(messageCount.count).toBe(0);
+    expect(checkpointCount.count).toBe(0);
+    expect(persistedSession?.id).toBe(session.id);
+    expect(persistedSession?.agent_session_id).toBeNull();
   });
 });

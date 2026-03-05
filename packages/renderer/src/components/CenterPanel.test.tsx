@@ -41,13 +41,16 @@ vi.mock('./ChatPanel', () => ({
 
 vi.mock('./WorkspaceHeaderMenu', () => ({
   WorkspaceHeaderMenu: ({
+    onClearHistory,
     onChangeStatus,
     onDelete,
   }: {
+    onClearHistory: () => void;
     onChangeStatus: () => void;
     onDelete: () => void;
   }) => (
     <div>
+      <button onClick={onClearHistory}>Clear Chat History</button>
       <button onClick={onChangeStatus}>Open Status Picker</button>
       <button onClick={onDelete}>Delete Workspace</button>
     </div>
@@ -81,6 +84,7 @@ const project = {
 describe('CenterPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     (window.maestro.invoke as any).mockImplementation((channel: string) => {
       if (channel === IPC_CHANNELS.TODO_LIST) {
         return Promise.resolve([]);
@@ -314,5 +318,38 @@ describe('CenterPanel', () => {
         'No checkpoints yet. Checkpoints are created before each agent turn.',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('clears current session chat history', async () => {
+    (window.maestro.invoke as any).mockImplementation((channel: string) => {
+      if (channel === IPC_CHANNELS.TODO_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.CHECKPOINT_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.SESSION_LIST) return Promise.resolve([{ id: 's1' }]);
+      if (channel === IPC_CHANNELS.AGENT_STATUS) return Promise.resolve('idle');
+      if (channel === IPC_CHANNELS.SESSION_CLEAR) return Promise.resolve({ success: true });
+      return Promise.resolve(null);
+    });
+
+    renderWithProviders(
+      <CenterPanel
+        workspace={workspace as any}
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SESSION_LIST, 'ws1');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear Chat History' }));
+
+    expect(window.confirm).toHaveBeenCalledWith('Clear chat history for this session?');
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SESSION_CLEAR, 's1');
+    });
+    expect(notifications.show).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Chat history cleared', color: 'green' }),
+    );
   });
 });

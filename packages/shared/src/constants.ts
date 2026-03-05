@@ -8,7 +8,13 @@ export const LOG_DIR_NAME = 'logs';
 
 export const AGENT_TYPES = ['claude-code', 'codex', 'cursor'] as const;
 
-export const WORKSPACE_STATUSES = ['backlog', 'in_progress', 'in_review', 'done', 'cancelled'] as const;
+export const WORKSPACE_STATUSES = [
+  'backlog',
+  'in_progress',
+  'in_review',
+  'done',
+  'cancelled',
+] as const;
 
 export const SESSION_STATUSES = [
   'initializing',
@@ -49,6 +55,7 @@ export const IPC_CHANNELS = {
   SESSION_CREATE: 'session:create',
   SESSION_GET: 'session:get',
   SESSION_LIST: 'session:list',
+  SESSION_CLEAR: 'session:clear',
 
   // Agent
   AGENT_START: 'agent:start',

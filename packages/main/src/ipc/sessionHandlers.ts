@@ -1,6 +1,11 @@
 import { IpcMain } from 'electron';
 import { IPC_CHANNELS } from '@maestro/shared';
-import { getSession, listSessions, getMessages } from '../services/sessionManager';
+import {
+  getSession,
+  listSessions,
+  getMessages,
+  clearSessionHistory,
+} from '../services/sessionManager';
 
 export function registerSessionHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(IPC_CHANNELS.SESSION_GET, (_event, id: string) => {
@@ -17,4 +22,9 @@ export function registerSessionHandlers(ipcMain: IpcMain): void {
       return getMessages(sessionId, limit, offset);
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.SESSION_CLEAR, (_event, sessionId: string) => {
+    clearSessionHistory(sessionId);
+    return { success: true };
+  });
 }

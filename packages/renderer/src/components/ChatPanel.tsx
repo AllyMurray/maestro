@@ -17,6 +17,7 @@ interface ChatPanelProps {
   sessionId: string | null;
   sessionIdRef: React.RefObject<string | null>;
   agentStatus: AgentStatus;
+  clearHistoryVersion?: number;
   onSend: (prompt: string) => void | Promise<void>;
   onStop?: () => void;
 }
@@ -39,6 +40,7 @@ export function ChatPanel({
   sessionId,
   sessionIdRef,
   agentStatus,
+  clearHistoryVersion = 0,
   onSend,
   onStop,
 }: ChatPanelProps) {
@@ -205,6 +207,12 @@ export function ChatPanel({
 
     lastSessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  useEffect(() => {
+    setMessages([]);
+    setStreamBuffer('');
+    seenOutputRef.current.clear();
+  }, [clearHistoryVersion]);
 
   // Load message history when sessionId changes
   useEffect(() => {

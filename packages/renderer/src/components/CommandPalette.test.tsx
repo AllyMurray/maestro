@@ -76,6 +76,7 @@ describe('CommandPalette', () => {
         onToggleRightPanel={vi.fn()}
         onOpenSettings={vi.fn()}
         onCreateWorkspace={vi.fn()}
+        onClearChatHistory={vi.fn()}
       />,
     );
 
@@ -93,6 +94,7 @@ describe('CommandPalette', () => {
         onToggleRightPanel={vi.fn()}
         onOpenSettings={vi.fn()}
         onCreateWorkspace={vi.fn()}
+        onClearChatHistory={vi.fn()}
       />,
     );
 
@@ -104,5 +106,23 @@ describe('CommandPalette', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Workspace One' }));
     expect(useAppStore.getState().activeWorkspaceId).toBe('w1');
+  });
+
+  it('runs clear history action when workspace is active', async () => {
+    useAppStore.setState({ activeWorkspaceId: 'w1' });
+    const onClearChatHistory = vi.fn();
+
+    renderWithProviders(
+      <CommandPalette
+        onToggleSidebar={vi.fn()}
+        onToggleRightPanel={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onCreateWorkspace={vi.fn()}
+        onClearChatHistory={onClearChatHistory}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear Chat History' }));
+    expect(onClearChatHistory).toHaveBeenCalledTimes(1);
   });
 });

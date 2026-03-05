@@ -4,11 +4,7 @@ import { mapRow, mapRows } from '../database/mapRow';
 import { logger } from './logger';
 import type { Session, SessionStatus, AgentType } from '@maestro/shared';
 
-export function createSession(
-  workspaceId: string,
-  agentType: AgentType,
-  model?: string,
-): Session {
+export function createSession(workspaceId: string, agentType: AgentType, model?: string): Session {
   const db = getDb();
   const id = uuid();
 
@@ -19,7 +15,9 @@ export function createSession(
 
   logger.info(`Session created: ${id} (${agentType}) for workspace ${workspaceId}`);
 
-  return mapRow<Session>(db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Record<string, unknown>);
+  return mapRow<Session>(
+    db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Record<string, unknown>,
+  );
 }
 
 export function getSession(id: string): Session | null {
@@ -31,7 +29,9 @@ export function getSession(id: string): Session | null {
 export function listSessions(workspaceId: string): Session[] {
   const db = getDb();
   return mapRows<Session>(
-    db.prepare('SELECT * FROM sessions WHERE workspace_id = ? ORDER BY created_at DESC').all(workspaceId) as Record<string, unknown>[],
+    db
+      .prepare('SELECT * FROM sessions WHERE workspace_id = ? ORDER BY created_at DESC')
+      .all(workspaceId) as Record<string, unknown>[],
   );
 }
 
@@ -78,4 +78,23 @@ export function getMessages(sessionId: string, limit?: number, offset?: number) 
   }
 
   return mapRows(db.prepare(query).all(...params) as Record<string, unknown>[]);
+}
+
+export function clearSessionHistory(sessionId: string): void {
+  const db = getDb();
+  const session = db.prepare('SELECT id FROM sessions WHERE id = ?').get(sessionId) as
+    | { id: string }
+    | undefined;
+
+  if (!session) {
+    throw new Error(`Session ${sessionId} not found`);
+  }
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+    db.prepare('DELETE FROM checkpoints WHERE session_id = ?').run(sessionId);
+    db.prepare('UPDATE sessions SET agent_session_id = NULL WHERE id = ?').run(sessionId);
+  })();
+
+  logger.info(`Cleared history for session ${sessionId}`);
 }

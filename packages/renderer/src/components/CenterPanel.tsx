@@ -38,6 +38,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
   const [todoCount, setTodoCount] = useState(0);
   const [todoBlockerCount, setTodoBlockerCount] = useState(0);
   const [checkpointCount, setCheckpointCount] = useState(0);
+  const [clearHistoryVersion, setClearHistoryVersion] = useState(0);
 
   const sessionIdRef = useRef<string | null>(null);
   const statusUnsubRef = useRef<(() => void) | null>(null);
@@ -221,6 +222,56 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
     }
   }, [workspace.id]);
 
+  const handleClearChatHistory = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) {
+      notifications.show({
+        title: 'No chat to clear',
+        message: 'Start a session first.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    if (agentStatus === 'running' || agentStatus === 'waiting') {
+      notifications.show({
+        title: 'Agent is active',
+        message: 'Stop the agent before clearing chat history.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    if (!confirm('Clear chat history for this session?')) return;
+
+    try {
+      await ipc.invoke(IPC_CHANNELS.SESSION_CLEAR, sid);
+      setClearHistoryVersion((v) => v + 1);
+      notifications.show({
+        title: 'Chat history cleared',
+        message: 'This session is now empty.',
+        color: 'green',
+      });
+      loadCheckpointMeta();
+    } catch (err) {
+      notifications.show({
+        title: 'Failed to clear chat history',
+        message: String(err),
+        color: 'red',
+      });
+    }
+  }, [agentStatus, loadCheckpointMeta]);
+
+  useEffect(() => {
+    const onClearHistory = () => {
+      void handleClearChatHistory();
+    };
+    window.addEventListener('maestro:clear-chat-history', onClearHistory);
+    return () => {
+      window.removeEventListener('maestro:clear-chat-history', onClearHistory);
+    };
+  }, [handleClearChatHistory]);
+
   useEffect(() => {
     loadTodoMeta();
     loadCheckpointMeta();
@@ -316,6 +367,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
             onOpenTodos={openTodos}
             onOpenPR={openPR}
             onLinkIssue={openIssueLinker}
+            onClearHistory={handleClearChatHistory}
             onChangeStatus={openStatusPicker}
             onDelete={() => onDeleteWorkspace(workspace.id)}
             hasPR={!!workspace.prUrl}
@@ -332,6 +384,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         sessionId={sessionId}
         sessionIdRef={sessionIdRef}
         agentStatus={agentStatus}
+        clearHistoryVersion={clearHistoryVersion}
         onSend={handleSendPrompt}
         onStop={handleStopAgent}
       />

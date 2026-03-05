@@ -6,6 +6,7 @@ interface WorkspaceHeaderMenuProps {
   onOpenTodos: () => void;
   onOpenPR: () => void;
   onLinkIssue: () => void;
+  onClearHistory: () => void;
   onChangeStatus: () => void;
   onDelete: () => void;
   hasPR: boolean;
@@ -17,6 +18,7 @@ export function WorkspaceHeaderMenu({
   onOpenTodos,
   onOpenPR,
   onLinkIssue,
+  onClearHistory,
   onChangeStatus,
   onDelete,
   hasPR,
@@ -39,6 +41,7 @@ export function WorkspaceHeaderMenu({
             <Menu.Item onClick={onLinkIssue}>Link Issue</Menu.Item>
           </>
         )}
+        <Menu.Item onClick={onClearHistory}>Clear Chat History</Menu.Item>
         <Menu.Item onClick={onChangeStatus}>Change Status</Menu.Item>
         <Menu.Divider />
         <Menu.Item color="red" onClick={onDelete}>

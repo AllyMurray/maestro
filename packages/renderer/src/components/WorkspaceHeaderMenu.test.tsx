@@ -9,6 +9,7 @@ function renderMenu(overrides: Partial<React.ComponentProps<typeof WorkspaceHead
     onOpenTodos: vi.fn(),
     onOpenPR: vi.fn(),
     onLinkIssue: vi.fn(),
+    onClearHistory: vi.fn(),
     onChangeStatus: vi.fn(),
     onDelete: vi.fn(),
     hasPR: false,
@@ -28,9 +29,12 @@ describe('WorkspaceHeaderMenu', () => {
     await userEvent.click(await screen.findByText('Checkpoints'));
     await userEvent.click(screen.getByRole('button', { name: 'Workspace actions' }));
     await userEvent.click(await screen.findByText('Todos'));
+    await userEvent.click(screen.getByRole('button', { name: 'Workspace actions' }));
+    await userEvent.click(await screen.findByText('Clear Chat History'));
 
     expect(props.onOpenCheckpoints).toHaveBeenCalledTimes(1);
     expect(props.onOpenTodos).toHaveBeenCalledTimes(1);
+    expect(props.onClearHistory).toHaveBeenCalledTimes(1);
   });
 
   it('hides PR and issue actions when no git platform', async () => {
