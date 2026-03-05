@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Stack, Group, Text, Badge, ActionIcon, Select, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -14,7 +14,82 @@ import { IconPlayerStop, IconArchive, IconGitBranch } from './Icons';
 import { useAppStore } from '../stores/appStore';
 import { ipc } from '../services/ipc';
 import { IPC_CHANNELS, WORKSPACE_STATUSES } from '@maestro/shared';
-import type { AgentStatus, Workspace, Project, WorkspaceStatus } from '@maestro/shared';
+import type { AgentStatus, Workspace, Project, WorkspaceStatus, AgentType } from '@maestro/shared';
+
+interface ChatSettings {
+  model: string;
+  thinking: boolean;
+  plan: boolean;
+}
+
+const DEFAULT_CHAT_SETTINGS: ChatSettings = {
+  model: 'default',
+  thinking: false,
+  plan: false,
+};
+
+const MODEL_OPTIONS_BY_AGENT: Record<AgentType, Array<{ value: string; label: string }>> = {
+  'claude-code': [
+    { value: 'default', label: 'Default' },
+    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+    { value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
+  ],
+  codex: [
+    { value: 'default', label: 'Default' },
+    { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
+    { value: 'gpt-4.1', label: 'GPT-4.1' },
+    { value: 'o4-mini', label: 'o4-mini' },
+  ],
+  cursor: [
+    { value: 'default', label: 'Default' },
+    { value: 'claude-3.7-sonnet', label: 'Claude 3.7 Sonnet' },
+    { value: 'gpt-4.1', label: 'GPT-4.1' },
+    { value: 'auto', label: 'Auto' },
+  ],
+};
+
+function parseChatSettings(settingsJson?: string): ChatSettings {
+  if (!settingsJson) return DEFAULT_CHAT_SETTINGS;
+  try {
+    const parsed = JSON.parse(settingsJson) as { chat?: Partial<ChatSettings> };
+    return {
+      model: parsed.chat?.model || 'default',
+      thinking: !!parsed.chat?.thinking,
+      plan: !!parsed.chat?.plan,
+    };
+  } catch {
+    return DEFAULT_CHAT_SETTINGS;
+  }
+}
+
+function mergeChatSettings(settingsJson: string | undefined, chat: ChatSettings): string {
+  let parsed: Record<string, unknown> = {};
+  if (settingsJson) {
+    try {
+      parsed = JSON.parse(settingsJson) as Record<string, unknown>;
+    } catch {
+      parsed = {};
+    }
+  }
+  return JSON.stringify({ ...parsed, chat });
+}
+
+function applyPromptModes(prompt: string, chat: ChatSettings): string {
+  const instructions: string[] = [];
+  if (chat.plan) {
+    instructions.push(
+      'Plan mode is enabled. Start with a concise, numbered implementation plan before any execution details.',
+    );
+  }
+  if (chat.thinking) {
+    instructions.push(
+      'Thinking mode is enabled. Reason carefully and verify assumptions before giving the final answer.',
+    );
+  }
+  if (instructions.length === 0) return prompt;
+  return `${instructions.join('\n')}\n\nUser request:\n${prompt}`;
+}
 
 interface CenterPanelProps {
   workspace: Workspace;
@@ -39,6 +114,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
   const [todoBlockerCount, setTodoBlockerCount] = useState(0);
   const [checkpointCount, setCheckpointCount] = useState(0);
   const [clearHistoryVersion, setClearHistoryVersion] = useState(0);
+  const [chatSettings, setChatSettings] = useState<ChatSettings>(DEFAULT_CHAT_SETTINGS);
 
   const sessionIdRef = useRef<string | null>(null);
   const statusUnsubRef = useRef<(() => void) | null>(null);
@@ -55,6 +131,39 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
     });
   }, []);
 
+  const modelOptions = useMemo(() => {
+    return MODEL_OPTIONS_BY_AGENT[workspace.agentType] || MODEL_OPTIONS_BY_AGENT['claude-code'];
+  }, [workspace.agentType]);
+
+  useEffect(() => {
+    const parsed = parseChatSettings(workspace.settingsJson);
+    const validModel = modelOptions.some((option) => option.value === parsed.model)
+      ? parsed.model
+      : 'default';
+    setChatSettings({ ...parsed, model: validModel });
+  }, [modelOptions, workspace.id, workspace.settingsJson]);
+
+  const persistChatSettings = useCallback(
+    async (next: ChatSettings) => {
+      setChatSettings(next);
+      const settingsJson = mergeChatSettings(workspace.settingsJson, next);
+      updateWorkspace(workspace.id, { settingsJson });
+      try {
+        await ipc.invoke(IPC_CHANNELS.WORKSPACE_UPDATE_SETTINGS, {
+          id: workspace.id,
+          settingsJson,
+        });
+      } catch (err) {
+        notifications.show({
+          title: 'Failed to save chat settings',
+          message: String(err),
+          color: 'red',
+        });
+      }
+    },
+    [updateWorkspace, workspace.id, workspace.settingsJson],
+  );
+
   const handleSendPrompt = useCallback(
     async (prompt: string): Promise<void> => {
       try {
@@ -67,6 +176,9 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
           return;
         }
 
+        const transformedPrompt = applyPromptModes(prompt, chatSettings);
+        const opts = chatSettings.model === 'default' ? {} : { model: chatSettings.model };
+
         if (!sessionIdRef.current) {
           attachStatusListener();
 
@@ -74,7 +186,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
             workspaceId: workspace.id,
             workspacePath: workspace.worktreePath || '',
             agentType: workspace.agentType,
-            opts: {},
+            opts,
           });
           sessionIdRef.current = result.sessionId;
           setSessionId(result.sessionId);
@@ -82,12 +194,12 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
 
           await ipc.invoke(IPC_CHANNELS.AGENT_SEND, {
             sessionId: result.sessionId,
-            prompt,
+            prompt: transformedPrompt,
           });
         } else {
           await ipc.invoke(IPC_CHANNELS.AGENT_SEND, {
             sessionId: sessionIdRef.current,
-            prompt,
+            prompt: transformedPrompt,
           });
         }
       } catch (err) {
@@ -103,7 +215,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         throw err;
       }
     },
-    [attachStatusListener, workspace],
+    [attachStatusListener, chatSettings, workspace],
   );
 
   useEffect(() => {
@@ -387,6 +499,19 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         clearHistoryVersion={clearHistoryVersion}
         onSend={handleSendPrompt}
         onStop={handleStopAgent}
+        modelOptions={modelOptions}
+        selectedModel={chatSettings.model}
+        thinkingEnabled={chatSettings.thinking}
+        planEnabled={chatSettings.plan}
+        onModelChange={(value) => {
+          void persistChatSettings({ ...chatSettings, model: value });
+        }}
+        onThinkingChange={(value) => {
+          void persistChatSettings({ ...chatSettings, thinking: value });
+        }}
+        onPlanChange={(value) => {
+          void persistChatSettings({ ...chatSettings, plan: value });
+        }}
       />
 
       {/* Status picker modal */}

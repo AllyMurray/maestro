@@ -119,6 +119,11 @@ const migrations: Migration[] = [
     // Note: SQLite doesn't support ALTER COLUMN DEFAULT. New workspaces set status
     // explicitly in the WORKSPACE_CREATE handler, so the old default is harmless.
   },
+  {
+    version: 4,
+    name: 'add_workspace_settings_json',
+    sql: `ALTER TABLE workspaces ADD COLUMN settings_json TEXT DEFAULT '{}';`,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

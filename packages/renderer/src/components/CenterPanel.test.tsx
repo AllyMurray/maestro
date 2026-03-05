@@ -63,6 +63,7 @@ const workspace = {
   name: 'Workspace One',
   branchName: 'feat/ui',
   worktreePath: '/tmp/worktree',
+  settingsJson: '{}',
   agentType: 'claude-code',
   status: 'in_progress',
   prNumber: null,
@@ -219,6 +220,48 @@ describe('CenterPanel', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Mock Stop' }));
     expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_STOP, 's1');
+  });
+
+  it('applies workspace chat settings to model opts and prompt shaping', async () => {
+    (window.maestro.invoke as any).mockImplementation((channel: string) => {
+      if (channel === IPC_CHANNELS.TODO_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.CHECKPOINT_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.AGENT_START) return Promise.resolve({ sessionId: 's1' });
+      if (channel === IPC_CHANNELS.AGENT_SEND) return Promise.resolve({ success: true });
+      return Promise.resolve(null);
+    });
+
+    renderWithProviders(
+      <CenterPanel
+        workspace={
+          {
+            ...workspace,
+            settingsJson: '{"chat":{"model":"claude-opus-4-20250514","thinking":true,"plan":true}}',
+          } as any
+        }
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mock Send' }));
+
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_START, {
+        workspaceId: 'ws1',
+        workspacePath: '/tmp/worktree',
+        agentType: 'claude-code',
+        opts: { model: 'claude-opus-4-20250514' },
+      });
+    });
+
+    const sendCall = (window.maestro.invoke as any).mock.calls.find(
+      (call: unknown[]) => call[0] === IPC_CHANNELS.AGENT_SEND,
+    );
+    expect(sendCall).toBeDefined();
+    expect(String(sendCall[1].prompt)).toContain('Plan mode is enabled');
+    expect(String(sendCall[1].prompt)).toContain('Thinking mode is enabled');
+    expect(String(sendCall[1].prompt)).toContain('User request:\nTest prompt');
   });
 
   it('shows notification when workspace path is missing', async () => {

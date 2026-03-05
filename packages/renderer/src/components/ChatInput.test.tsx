@@ -55,6 +55,45 @@ describe('ChatInput', () => {
     expect(textarea).toHaveValue('');
   });
 
+  it('sends message when send button is clicked', async () => {
+    const onSend = vi.fn();
+    renderWithProviders(<ChatInput onSend={onSend} />);
+
+    const textarea = screen.getByRole('textbox');
+    await userEvent.type(textarea, 'Click send');
+    await userEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    expect(onSend).toHaveBeenCalledWith('Click send');
+  });
+
+  it('disables send button for empty input', () => {
+    renderWithProviders(<ChatInput onSend={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  });
+
+  it('renders model and mode controls when provided', () => {
+    renderWithProviders(
+      <ChatInput
+        onSend={() => {}}
+        modelOptions={[
+          { value: 'default', label: 'Default' },
+          { value: 'cursor-small', label: 'Cursor Small' },
+        ]}
+        selectedModel="default"
+        thinkingEnabled={false}
+        planEnabled={false}
+        onModelChange={() => {}}
+        onThinkingChange={() => {}}
+        onPlanChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText(/Type a message/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Model')[0]).toBeInTheDocument();
+    expect(screen.getByLabelText('Thinking')).toBeInTheDocument();
+    expect(screen.getByLabelText('Plan')).toBeInTheDocument();
+  });
+
   it('does not send on plain Enter (allows newlines)', async () => {
     const onSend = vi.fn();
     renderWithProviders(<ChatInput onSend={onSend} />);

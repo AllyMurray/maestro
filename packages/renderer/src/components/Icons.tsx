@@ -33,9 +33,7 @@ export const IconPlus = createIcon('M12 5v14M5 12h14');
 export const IconSettings = createIcon(
   'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z',
 );
-export const IconLayoutSidebar = createIcon(
-  'M3 3h18v18H3zM9 3v18',
-);
+export const IconLayoutSidebar = createIcon('M3 3h18v18H3zM9 3v18');
 export const IconFolder = createIcon(
   'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z',
 );
@@ -59,9 +57,7 @@ export const IconSearch = createIcon('M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM21 21
 export const IconGitPullRequest = createIcon(
   'M18 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9v12M18 15V6a3 3 0 0 0-3-3H13',
 );
-export const IconArchive = createIcon(
-  'M21 8v13H3V8M1 3h22v5H1zM10 12h4',
-);
+export const IconArchive = createIcon('M21 8v13H3V8M1 3h22v5H1zM10 12h4');
 export const IconPlayerStop = createIcon('M6 6h12v12H6z');
 export const IconLink = createIcon(
   'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
@@ -72,3 +68,4 @@ export const IconFile = createIcon(
 );
 export const IconDotsVertical = createIcon('M12 5v.01M12 12v.01M12 19v.01');
 export const IconPanelRight = createIcon('M3 3h18v18H3zM15 3v18');
+export const IconArrowUp = createIcon('M12 19V5M5 12l7-7 7 7');

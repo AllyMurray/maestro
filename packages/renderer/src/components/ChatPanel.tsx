@@ -20,6 +20,13 @@ interface ChatPanelProps {
   clearHistoryVersion?: number;
   onSend: (prompt: string) => void | Promise<void>;
   onStop?: () => void;
+  modelOptions?: Array<{ value: string; label: string }>;
+  selectedModel?: string;
+  thinkingEnabled?: boolean;
+  planEnabled?: boolean;
+  onModelChange?: (value: string) => void;
+  onThinkingChange?: (value: boolean) => void;
+  onPlanChange?: (value: boolean) => void;
 }
 
 function coalesceAssistantHistory(messages: ChatMessage[]): ChatMessage[] {
@@ -43,6 +50,13 @@ export function ChatPanel({
   clearHistoryVersion = 0,
   onSend,
   onStop,
+  modelOptions,
+  selectedModel,
+  thinkingEnabled,
+  planEnabled,
+  onModelChange,
+  onThinkingChange,
+  onPlanChange,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamBuffer, setStreamBuffer] = useState('');
@@ -278,7 +292,17 @@ export function ChatPanel({
       </ScrollArea>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={isRunning} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={isRunning}
+        modelOptions={modelOptions}
+        selectedModel={selectedModel}
+        thinkingEnabled={thinkingEnabled}
+        planEnabled={planEnabled}
+        onModelChange={onModelChange}
+        onThinkingChange={onThinkingChange}
+        onPlanChange={onPlanChange}
+      />
     </Stack>
   );
 }

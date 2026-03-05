@@ -28,6 +28,7 @@ export interface Workspace {
   name: string;
   branchName: string;
   worktreePath: string | null;
+  settingsJson?: string;
   agentType: AgentType;
   status: WorkspaceStatus;
   prNumber: string | null;

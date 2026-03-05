@@ -77,6 +77,7 @@ describe('workspaceHandlers', () => {
     expect(workspace.targetBranch).toBe('main');
     expect(workspace.status).toBe('in_progress');
     expect(workspace.agentType).toBe('claude-code');
+    expect(workspace.settingsJson).toBe('{}');
   });
 
   it('deletes workspace and attempts worktree cleanup', async () => {
@@ -112,5 +113,31 @@ describe('workspaceHandlers', () => {
         status: 'bogus',
       }),
     ).toThrow('Invalid workspace status: bogus');
+  });
+
+  it('updates workspace settings JSON', async () => {
+    testDb
+      .prepare(
+        "INSERT INTO workspaces (id, project_id, name, branch_name, worktree_path, status, agent_type, settings_json) VALUES ('w3','p1','WS3','feat/c','/tmp/repo/.worktrees/feat-c','in_progress','cursor','{}')",
+      )
+      .run();
+
+    const updated = await handlers[IPC_CHANNELS.WORKSPACE_UPDATE_SETTINGS](null, {
+      id: 'w3',
+      settingsJson: '{"chat":{"model":"cursor-small","thinking":true,"plan":false}}',
+    });
+
+    expect(updated.settingsJson).toBe(
+      '{"chat":{"model":"cursor-small","thinking":true,"plan":false}}',
+    );
+  });
+
+  it('throws for invalid workspace settings JSON', () => {
+    expect(() =>
+      handlers[IPC_CHANNELS.WORKSPACE_UPDATE_SETTINGS](null, {
+        id: 'w3',
+        settingsJson: '{invalid',
+      }),
+    ).toThrow();
   });
 });

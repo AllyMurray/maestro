@@ -50,6 +50,7 @@ export const IPC_CHANNELS = {
   WORKSPACE_GET: 'workspace:get',
   WORKSPACE_DELETE: 'workspace:delete',
   WORKSPACE_UPDATE_STATUS: 'workspace:update-status',
+  WORKSPACE_UPDATE_SETTINGS: 'workspace:update-settings',
 
   // Sessions
   SESSION_CREATE: 'session:create',
