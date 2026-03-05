@@ -236,7 +236,7 @@ describe('CenterPanel', () => {
         workspace={
           {
             ...workspace,
-            settingsJson: '{"chat":{"model":"claude-opus-4-20250514","thinking":true,"plan":true}}',
+            settingsJson: '{"chat":{"model":"claude-opus-4-6","thinking":true,"plan":true}}',
           } as any
         }
         project={project as any}
@@ -251,7 +251,7 @@ describe('CenterPanel', () => {
         workspaceId: 'ws1',
         workspacePath: '/tmp/worktree',
         agentType: 'claude-code',
-        opts: { model: 'claude-opus-4-20250514' },
+        opts: { model: 'claude-opus-4-6' },
       });
     });
 
@@ -262,6 +262,41 @@ describe('CenterPanel', () => {
     expect(String(sendCall[1].prompt)).toContain('Plan mode is enabled');
     expect(String(sendCall[1].prompt)).toContain('Thinking mode is enabled');
     expect(String(sendCall[1].prompt)).toContain('User request:\nTest prompt');
+  });
+
+  it('falls back to default model when saved model is invalid for agent type', async () => {
+    (window.maestro.invoke as any).mockImplementation((channel: string) => {
+      if (channel === IPC_CHANNELS.TODO_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.CHECKPOINT_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.AGENT_START) return Promise.resolve({ sessionId: 's1' });
+      if (channel === IPC_CHANNELS.AGENT_SEND) return Promise.resolve({ success: true });
+      return Promise.resolve(null);
+    });
+
+    renderWithProviders(
+      <CenterPanel
+        workspace={
+          {
+            ...workspace,
+            agentType: 'codex',
+            settingsJson: '{"chat":{"model":"claude-opus-4-6","thinking":false,"plan":false}}',
+          } as any
+        }
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mock Send' }));
+
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_START, {
+        workspaceId: 'ws1',
+        workspacePath: '/tmp/worktree',
+        agentType: 'codex',
+        opts: {},
+      });
+    });
   });
 
   it('shows notification when workspace path is missing', async () => {

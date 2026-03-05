@@ -28,25 +28,21 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   plan: false,
 };
 
+const CLAUDE_MODEL_OPTIONS = [
+  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+];
+
+const CODEX_MODEL_OPTIONS = [
+  { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+  { value: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
+];
+
 const MODEL_OPTIONS_BY_AGENT: Record<AgentType, Array<{ value: string; label: string }>> = {
-  'claude-code': [
-    { value: 'default', label: 'Default' },
-    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
-    { value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
-  ],
-  codex: [
-    { value: 'default', label: 'Default' },
-    { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
-    { value: 'gpt-4.1', label: 'GPT-4.1' },
-    { value: 'o4-mini', label: 'o4-mini' },
-  ],
-  cursor: [
-    { value: 'default', label: 'Default' },
-    { value: 'claude-3.7-sonnet', label: 'Claude 3.7 Sonnet' },
-    { value: 'gpt-4.1', label: 'GPT-4.1' },
-    { value: 'auto', label: 'Auto' },
-  ],
+  'claude-code': [{ value: 'default', label: 'Default' }, ...CLAUDE_MODEL_OPTIONS],
+  codex: [{ value: 'default', label: 'Default' }, ...CODEX_MODEL_OPTIONS],
+  cursor: [{ value: 'default', label: 'Default' }, ...CLAUDE_MODEL_OPTIONS, ...CODEX_MODEL_OPTIONS],
 };
 
 function parseChatSettings(settingsJson?: string): ChatSettings {
