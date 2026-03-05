@@ -17,6 +17,7 @@ export class CursorManager extends BaseAgentManager {
   private process: ChildProcess | null = null;
   private buffer = '';
   private stderrBuffer = '';
+  private emittedTextThisTurn = '';
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private watchdogTimeout: number;
   private _opts: AgentOpts = {};
@@ -105,6 +106,7 @@ export class CursorManager extends BaseAgentManager {
 
     this.buffer = '';
     this.stderrBuffer = '';
+    this.emittedTextThisTurn = '';
     this.resetWatchdog();
 
     this.process.stdout?.on('data', (data: Buffer) => {
@@ -126,7 +128,7 @@ export class CursorManager extends BaseAgentManager {
     this.process.on('close', (code, signal) => {
       this.clearWatchdog();
       if (this.buffer.trim()) {
-        this.emitOutput('text', this.buffer.trim());
+        this.emitText(this.buffer.trim());
         this.buffer = '';
       }
 
@@ -184,9 +186,18 @@ export class CursorManager extends BaseAgentManager {
         const msg = JSON.parse(line);
         this.handleMessage(msg);
       } catch {
-        this.emitOutput('text', line);
+        this.emitText(line);
       }
     }
+  }
+
+  private emitText(content: string): void {
+    this.emitOutput('text', content);
+    this.emittedTextThisTurn += content;
+  }
+
+  private normalizeWhitespace(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   private handleMessage(msg: Record<string, unknown>): void {
@@ -206,7 +217,7 @@ export class CursorManager extends BaseAgentManager {
       case 'content_block_delta': {
         const delta = msg.delta as Record<string, unknown>;
         if (delta?.type === 'text_delta') {
-          this.emitOutput('text', delta.text as string);
+          this.emitText(delta.text as string);
         }
         // Handle full message
         const content = msg.message as Record<string, unknown>;
@@ -215,7 +226,7 @@ export class CursorManager extends BaseAgentManager {
           if (Array.isArray(blocks)) {
             for (const block of blocks) {
               if (block.type === 'text') {
-                this.emitOutput('text', block.text as string);
+                this.emitText(block.text as string);
               } else if (block.type === 'tool_use') {
                 this.emitOutput('tool_call', JSON.stringify(block), {
                   toolName: block.name as string,
@@ -230,7 +241,16 @@ export class CursorManager extends BaseAgentManager {
       case 'result': {
         const result = msg.result as string;
         if (result) {
-          this.emitOutput('text', result);
+          const normalizedResult = this.normalizeWhitespace(result);
+          const normalizedPrior = this.normalizeWhitespace(this.emittedTextThisTurn);
+          const isDuplicate =
+            !!normalizedPrior &&
+            (normalizedResult === normalizedPrior ||
+              normalizedResult.endsWith(normalizedPrior) ||
+              normalizedPrior.endsWith(normalizedResult));
+          if (!isDuplicate) {
+            this.emitText(result);
+          }
         }
         break;
       }

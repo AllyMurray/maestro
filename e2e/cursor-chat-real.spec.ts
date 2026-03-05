@@ -25,7 +25,7 @@ test.describe('Cursor Chat Real E2E', () => {
   test.skip(!CURSOR_AUTHENTICATED, 'Cursor CLI is not authenticated');
   test.setTimeout(180000);
 
-  test('sends a prompt and gets branch response', async ({ page, testDataDir }) => {
+  test('sends a prompt and gets one assistant response', async ({ page, testDataDir }) => {
     await expect(page.getByRole('heading', { name: 'Maestro' })).toBeVisible({ timeout: 10000 });
 
     const repoPath = createTempGitRepo(testDataDir, 'cursor-chat-real');
@@ -43,11 +43,12 @@ test.describe('Cursor Chat Real E2E', () => {
     await page.getByText('Cursor Real Chat').click();
 
     const textarea = page.getByPlaceholder('Type a message');
-    await textarea.fill('Which branch am I in?');
+    await textarea.fill('Reply with exactly: OK');
     await textarea.press('Meta+Enter');
 
-    await expect(page.getByText('Which branch am I in?')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/main/i).first()).toBeVisible({ timeout: 90000 });
+    await expect(page.getByText('Reply with exactly: OK')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('OK').first()).toBeVisible({ timeout: 90000 });
+    await expect(page.getByText(/^OKOK$/)).toHaveCount(0);
     await expect(page.getByText(/timed out and was killed/i)).toHaveCount(0);
   });
 });

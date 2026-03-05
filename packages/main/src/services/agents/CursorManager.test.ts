@@ -352,6 +352,21 @@ describe('CursorManager', () => {
       expect(outputs[0].content).toBe('Task completed.');
     });
 
+    it('does not emit duplicate text from result when assistant already emitted same content', () => {
+      const outputs: any[] = [];
+      manager.on('output', (o) => outputs.push(o));
+
+      (manager as any).handleMessage({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'You are on main.' }] },
+      });
+      (manager as any).handleMessage({ type: 'result', result: 'You are on main.' });
+
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].type).toBe('text');
+      expect(outputs[0].content).toBe('You are on main.');
+    });
+
     it('ignores result message without result text', () => {
       const outputs: any[] = [];
       manager.on('output', (o) => outputs.push(o));
