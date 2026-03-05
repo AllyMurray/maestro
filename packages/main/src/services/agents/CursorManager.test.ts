@@ -353,6 +353,48 @@ describe('CursorManager', () => {
       expect(outputs[1].metadata?.toolName).toBe('Read');
     });
 
+    it('suppresses assistant text when text_delta already streamed this turn', () => {
+      const outputs: any[] = [];
+      manager.on('output', (o) => outputs.push(o));
+
+      (manager as any).handleMessage({
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: 'You are on main.' },
+      });
+      (manager as any).handleMessage({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'You are on main.' }] },
+      });
+
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].type).toBe('text');
+      expect(outputs[0].content).toBe('You are on main.');
+    });
+
+    it('still emits tool_call from assistant after text_delta', () => {
+      const outputs: any[] = [];
+      manager.on('output', (o) => outputs.push(o));
+
+      (manager as any).handleMessage({
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: 'Checking...' },
+      });
+      (manager as any).handleMessage({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'text', text: 'Checking...' },
+            { type: 'tool_use', name: 'Read', id: 'tool-1', input: { path: '/a.ts' } },
+          ],
+        },
+      });
+
+      expect(outputs).toHaveLength(2);
+      expect(outputs[0].type).toBe('text');
+      expect(outputs[1].type).toBe('tool_call');
+      expect(outputs[1].metadata?.toolName).toBe('Read');
+    });
+
     it('emits text from result message', () => {
       const outputs: any[] = [];
       manager.on('output', (o) => outputs.push(o));
@@ -371,6 +413,21 @@ describe('CursorManager', () => {
       (manager as any).handleMessage({
         type: 'assistant',
         message: { content: [{ type: 'text', text: 'You are on main.' }] },
+      });
+      (manager as any).handleMessage({ type: 'result', result: 'You are on main.' });
+
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].type).toBe('text');
+      expect(outputs[0].content).toBe('You are on main.');
+    });
+
+    it('does not emit duplicate text from result when content_block_delta already emitted same content', () => {
+      const outputs: any[] = [];
+      manager.on('output', (o) => outputs.push(o));
+
+      (manager as any).handleMessage({
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: 'You are on main.' },
       });
       (manager as any).handleMessage({ type: 'result', result: 'You are on main.' });
 

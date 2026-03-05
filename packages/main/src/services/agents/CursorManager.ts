@@ -18,6 +18,7 @@ export class CursorManager extends BaseAgentManager {
   private buffer = '';
   private stderrBuffer = '';
   private emittedTextThisTurn = '';
+  private sawTextDeltaThisTurn = false;
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private watchdogTimeout: number;
   private _opts: AgentOpts = {};
@@ -111,6 +112,7 @@ export class CursorManager extends BaseAgentManager {
     this.buffer = '';
     this.stderrBuffer = '';
     this.emittedTextThisTurn = '';
+    this.sawTextDeltaThisTurn = false;
     this.resetWatchdog();
 
     this.process.stdout?.on('data', (data: Buffer) => {
@@ -221,6 +223,7 @@ export class CursorManager extends BaseAgentManager {
       case 'content_block_delta': {
         const delta = msg.delta as Record<string, unknown>;
         if (delta?.type === 'text_delta') {
+          this.sawTextDeltaThisTurn = true;
           this.emitText(delta.text as string);
         }
         // Handle full message
@@ -230,7 +233,9 @@ export class CursorManager extends BaseAgentManager {
           if (Array.isArray(blocks)) {
             for (const block of blocks) {
               if (block.type === 'text') {
-                this.emitText(block.text as string);
+                if (!this.sawTextDeltaThisTurn) {
+                  this.emitText(block.text as string);
+                }
               } else if (block.type === 'tool_use') {
                 this.emitOutput('tool_call', JSON.stringify(block), {
                   toolName: block.name as string,
