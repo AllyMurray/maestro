@@ -215,6 +215,53 @@ describe('ChatPanel', () => {
     expect(screen.getAllByText('same assistant line')).toHaveLength(1);
   });
 
+  it('coalesces streamed assistant flushes into a single bubble', async () => {
+    const sessionIdRef = { current: 'session-1' as string | null };
+
+    renderWithProviders(
+      <ChatPanel
+        sessionId="session-1"
+        sessionIdRef={sessionIdRef}
+        agentStatus="running"
+        onSend={() => {}}
+      />,
+    );
+
+    act(() => {
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'text',
+          content: 'Hello',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      fireEvent('agent:status', {
+        sessionId: 'session-1',
+        status: 'waiting',
+      });
+
+      fireEvent('agent:output', {
+        sessionId: 'session-1',
+        output: {
+          type: 'text',
+          content: ' world',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      fireEvent('agent:status', {
+        sessionId: 'session-1',
+        status: 'waiting',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Hello world')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Hello')).not.toBeInTheDocument();
+    expect(screen.queryByText(' world')).not.toBeInTheDocument();
+  });
+
   it('does not emit duplicate React keys when Date.now collides', async () => {
     const sessionIdRef = { current: 'session-1' as string | null };
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1771869307165);

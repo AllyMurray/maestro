@@ -77,6 +77,15 @@ export function ChatPanel({
       if (last && last.role === msg.role && last.content === msg.content) {
         return prev;
       }
+      if (last && last.role === 'assistant' && msg.role === 'assistant') {
+        const merged = [...prev];
+        merged[merged.length - 1] = {
+          ...last,
+          content: last.content + msg.content,
+          timestamp: msg.timestamp,
+        };
+        return merged;
+      }
       return [...prev, msg];
     });
   }, []);
