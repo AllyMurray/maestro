@@ -115,7 +115,7 @@ describe('CursorManager', () => {
       mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
     });
 
-    it('spawns cursor-agent with --print --output-format stream-json --trust', async () => {
+    it('spawns cursor-agent with streaming and trust flags', async () => {
       const mockProc = createMockProcess();
       mockSpawn.mockReturnValue(mockProc);
 
@@ -127,6 +127,8 @@ describe('CursorManager', () => {
       expect(cmd).toBe('cursor-agent');
       expect(args).toContain('--print');
       expect(args).toContain('--trust');
+      expect(args).toContain('--stream-partial-output');
+      expect(args).toContain('--force');
       expect(args).toContain('--output-format');
       expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
     });
@@ -219,6 +221,17 @@ describe('CursorManager', () => {
 
       const [, , opts] = mockSpawn.mock.calls[0];
       expect(opts.env.CURSOR_API_KEY).toBe('sk-secret');
+    });
+
+    it('does not pass --force when permissions are explicitly default', async () => {
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      await manager.start('/workspace', { permissions: 'default' });
+      await manager.send('hello');
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).not.toContain('--force');
     });
   });
 
@@ -395,6 +408,28 @@ describe('CursorManager', () => {
       vi.advanceTimersByTime(2000); // 6s since last reset
 
       expect(errors).toHaveLength(1);
+    });
+
+    it('does not emit duplicate exit error after watchdog kill', async () => {
+      mockExecFile.mockResolvedValue({ stdout: 'cursor-agent 0.1.0', stderr: '' });
+
+      const mockProc = createMockProcess();
+      mockSpawn.mockReturnValue(mockProc);
+
+      const errors: Error[] = [];
+      manager.on('error', (e) => errors.push(e));
+
+      await manager.start('/workspace', {});
+      await manager.send('hello');
+
+      const closeHandler = mockProc.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
+      expect(closeHandler).toBeTypeOf('function');
+
+      (manager as any).restartProcess();
+      closeHandler?.(null, 'SIGKILL');
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain('timed out');
     });
   });
 

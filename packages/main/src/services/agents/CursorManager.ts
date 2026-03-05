@@ -3,7 +3,7 @@ import type { AgentOpts, AgentType } from '@maestro/shared';
 import { BaseAgentManager } from './BaseAgentManager';
 import { logger } from '../logger';
 
-const DEFAULT_WATCHDOG_TIMEOUT = 120_000; // 2 minutes
+const DEFAULT_WATCHDOG_TIMEOUT = 600_000; // 10 minutes
 
 export class CursorManager extends BaseAgentManager {
   readonly type: AgentType = 'cursor';
@@ -19,6 +19,7 @@ export class CursorManager extends BaseAgentManager {
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private watchdogTimeout: number;
   private _opts: AgentOpts = {};
+  private killedByWatchdog = false;
 
   constructor(watchdogTimeout = DEFAULT_WATCHDOG_TIMEOUT) {
     super();
@@ -80,7 +81,10 @@ export class CursorManager extends BaseAgentManager {
     if (this._command === 'cursor') {
       args.push('agent');
     }
-    args.push('--print', '--output-format', 'stream-json', '--trust');
+    args.push('--print', '--output-format', 'stream-json', '--stream-partial-output', '--trust');
+    if (this._opts.permissions === 'skip' || this._opts.permissions == null) {
+      args.push('--force');
+    }
     if (this._workspacePath) args.push('--workspace', this._workspacePath);
     if (this._sessionId) args.push('--resume', this._sessionId);
     if (this._opts?.model) args.push('--model', this._opts.model);
@@ -92,6 +96,8 @@ export class CursorManager extends BaseAgentManager {
     }
 
     logger.info(`Spawning: ${this._command} ${args.join(' ')}`);
+
+    this.killedByWatchdog = false;
 
     this.process = spawn(this._command, args, {
       cwd: this._workspacePath!,
@@ -116,17 +122,33 @@ export class CursorManager extends BaseAgentManager {
       }
     });
 
-    this.process.on('close', (code) => {
+    this.process.on('close', (code, signal) => {
       this.clearWatchdog();
       if (this.buffer.trim()) {
         this.emitOutput('text', this.buffer.trim());
         this.buffer = '';
       }
+
+      if (this.killedByWatchdog) {
+        this.killedByWatchdog = false;
+        this.process = null;
+        return;
+      }
+
+      if (this._status === 'stopped') {
+        this.process = null;
+        return;
+      }
+
       if (code === 0) {
         this.setStatus('waiting');
       } else {
         this.setStatus('error');
-        this.emit('error', new Error(`Cursor exited with code ${code}`));
+        const message =
+          code === null && signal
+            ? `Cursor exited with signal ${signal}`
+            : `Cursor exited with code ${code}`;
+        this.emit('error', new Error(message));
       }
       this.process = null;
     });
@@ -157,6 +179,7 @@ export class CursorManager extends BaseAgentManager {
 
   private async restartProcess(): Promise<void> {
     if (this.process) {
+      this.killedByWatchdog = true;
       this.process.kill('SIGKILL');
       this.process = null;
     }
