@@ -42,6 +42,18 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
   const sessionIdRef = useRef<string | null>(null);
   const statusUnsubRef = useRef<(() => void) | null>(null);
 
+  const attachStatusListener = useCallback(() => {
+    if (statusUnsubRef.current) {
+      statusUnsubRef.current();
+    }
+    statusUnsubRef.current = ipc.on(IPC_CHANNELS.AGENT_STATUS, (data: unknown) => {
+      const { sessionId: sid, status } = data as { sessionId: string; status: AgentStatus };
+      if (sid === sessionIdRef.current) {
+        setAgentStatus(status);
+      }
+    });
+  }, []);
+
   const handleSendPrompt = useCallback(
     async (prompt: string): Promise<void> => {
       try {
@@ -55,15 +67,7 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         }
 
         if (!sessionIdRef.current) {
-          if (statusUnsubRef.current) {
-            statusUnsubRef.current();
-          }
-          statusUnsubRef.current = ipc.on(IPC_CHANNELS.AGENT_STATUS, (data: unknown) => {
-            const { sessionId: sid, status } = data as { sessionId: string; status: AgentStatus };
-            if (sid === sessionIdRef.current) {
-              setAgentStatus(status);
-            }
-          });
+          attachStatusListener();
 
           const result = await ipc.invoke<{ sessionId: string }>(IPC_CHANNELS.AGENT_START, {
             workspaceId: workspace.id,
@@ -98,8 +102,48 @@ export function CenterPanel({ workspace, project, onDeleteWorkspace }: CenterPan
         throw err;
       }
     },
-    [workspace],
+    [attachStatusListener, workspace],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (statusUnsubRef.current) {
+      statusUnsubRef.current();
+      statusUnsubRef.current = null;
+    }
+    sessionIdRef.current = null;
+    setSessionId(null);
+    setAgentStatus('idle');
+
+    ipc
+      .invoke<Array<{ id: string }>>(IPC_CHANNELS.SESSION_LIST, workspace.id)
+      .then(async (sessions) => {
+        if (cancelled) return;
+        const latest = Array.isArray(sessions) && sessions.length > 0 ? sessions[0] : null;
+        if (!latest?.id) return;
+
+        sessionIdRef.current = latest.id;
+        setSessionId(latest.id);
+        attachStatusListener();
+
+        try {
+          const status = await ipc.invoke<AgentStatus>(IPC_CHANNELS.AGENT_STATUS, latest.id);
+          if (!cancelled) {
+            setAgentStatus(status);
+          }
+        } catch {
+          if (!cancelled) {
+            setAgentStatus('idle');
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachStatusListener, workspace.id]);
 
   const handleStopAgent = useCallback(async () => {
     if (!sessionIdRef.current) return;

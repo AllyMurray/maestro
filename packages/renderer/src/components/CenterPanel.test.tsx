@@ -88,7 +88,96 @@ describe('CenterPanel', () => {
       if (channel === IPC_CHANNELS.CHECKPOINT_LIST) {
         return Promise.resolve([]);
       }
+      if (channel === IPC_CHANNELS.SESSION_LIST) {
+        return Promise.resolve([]);
+      }
+      if (channel === IPC_CHANNELS.AGENT_STATUS) {
+        return Promise.resolve('idle');
+      }
       return Promise.resolve(null);
+    });
+  });
+
+  it('restores latest workspace session on mount', async () => {
+    (window.maestro.invoke as any).mockImplementation((channel: string) => {
+      if (channel === IPC_CHANNELS.TODO_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.CHECKPOINT_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.SESSION_LIST)
+        return Promise.resolve([{ id: 's2' }, { id: 's1' }]);
+      if (channel === IPC_CHANNELS.AGENT_STATUS) return Promise.resolve('waiting');
+      if (channel === IPC_CHANNELS.AGENT_SEND) return Promise.resolve({ success: true });
+      if (channel === IPC_CHANNELS.AGENT_STOP) return Promise.resolve({ success: true });
+      return Promise.resolve(null);
+    });
+
+    renderWithProviders(
+      <CenterPanel
+        workspace={workspace as any}
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SESSION_LIST, 'ws1');
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_STATUS, 's2');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mock Send' }));
+    expect(window.maestro.invoke).not.toHaveBeenCalledWith(
+      IPC_CHANNELS.AGENT_START,
+      expect.anything(),
+    );
+    expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_SEND, {
+      sessionId: 's2',
+      prompt: 'Test prompt',
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mock Stop' }));
+    expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_STOP, 's2');
+  });
+
+  it('restores latest session for each selected workspace', async () => {
+    const secondWorkspace = {
+      ...workspace,
+      id: 'ws2',
+      name: 'Workspace Two',
+      branchName: 'feat/other',
+    };
+
+    (window.maestro.invoke as any).mockImplementation((channel: string, ...args: unknown[]) => {
+      if (channel === IPC_CHANNELS.TODO_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.CHECKPOINT_LIST) return Promise.resolve([]);
+      if (channel === IPC_CHANNELS.SESSION_LIST) {
+        return Promise.resolve(args[0] === 'ws1' ? [{ id: 's-ws1' }] : [{ id: 's-ws2' }]);
+      }
+      if (channel === IPC_CHANNELS.AGENT_STATUS) return Promise.resolve('idle');
+      return Promise.resolve(null);
+    });
+
+    const { rerender } = renderWithProviders(
+      <CenterPanel
+        workspace={workspace as any}
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_STATUS, 's-ws1');
+    });
+
+    rerender(
+      <CenterPanel
+        workspace={secondWorkspace as any}
+        project={project as any}
+        onDeleteWorkspace={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SESSION_LIST, 'ws2');
+      expect(window.maestro.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AGENT_STATUS, 's-ws2');
     });
   });
 

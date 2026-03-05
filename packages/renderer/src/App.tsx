@@ -35,6 +35,24 @@ export function resolveInitialActiveProjectId(
   return projects[0].id;
 }
 
+export function resolveInitialActiveWorkspaceId(
+  workspaces: Workspace[],
+  currentActiveWorkspaceId: string | null,
+  savedActiveWorkspaceId: string | null,
+): string | null {
+  if (workspaces.length === 0) return null;
+
+  if (currentActiveWorkspaceId && workspaces.some((w) => w.id === currentActiveWorkspaceId)) {
+    return currentActiveWorkspaceId;
+  }
+
+  if (savedActiveWorkspaceId && workspaces.some((w) => w.id === savedActiveWorkspaceId)) {
+    return savedActiveWorkspaceId;
+  }
+
+  return workspaces[0].id;
+}
+
 export default function App() {
   const [sidebarOpen, { toggle: toggleSidebar }] = useDisclosure(true);
   const [settingsOpen, { open: openSettings, close: closeSettings }] = useDisclosure(false);
@@ -138,11 +156,58 @@ export default function App() {
   // Load workspaces when project changes
   useEffect(() => {
     if (!activeProjectId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const loadedWorkspaces = await ipc.invoke<Workspace[]>(
+          IPC_CHANNELS.WORKSPACE_LIST,
+          activeProjectId,
+        );
+        if (cancelled) return;
+
+        setWorkspaces(loadedWorkspaces);
+
+        const savedActiveWorkspaceId = await ipc
+          .invoke<
+            string | null
+          >(IPC_CHANNELS.CONFIG_GET, `last_active_workspace_id:${activeProjectId}`)
+          .catch(() => null);
+        if (cancelled) return;
+
+        const nextActiveWorkspaceId = resolveInitialActiveWorkspaceId(
+          loadedWorkspaces,
+          activeWorkspaceId,
+          savedActiveWorkspaceId,
+        );
+        if (nextActiveWorkspaceId !== activeWorkspaceId) {
+          setActiveWorkspace(nextActiveWorkspaceId);
+        }
+      } catch {
+        if (cancelled) return;
+        setWorkspaces([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProjectId, activeWorkspaceId, setActiveWorkspace, setWorkspaces]);
+
+  useEffect(() => {
+    if (!activeProjectId || !activeWorkspaceId) return;
+    const belongsToProject = workspaces.some(
+      (workspace) => workspace.id === activeWorkspaceId && workspace.projectId === activeProjectId,
+    );
+    if (!belongsToProject) return;
     ipc
-      .invoke<Workspace[]>(IPC_CHANNELS.WORKSPACE_LIST, activeProjectId)
-      .then(setWorkspaces)
+      .invoke(
+        IPC_CHANNELS.CONFIG_SET,
+        `last_active_workspace_id:${activeProjectId}`,
+        activeWorkspaceId,
+      )
       .catch(() => {});
-  }, [activeProjectId, setWorkspaces]);
+  }, [activeProjectId, activeWorkspaceId, workspaces]);
 
   const handleCreateWorkspace = useCallback(
     async (data: {
